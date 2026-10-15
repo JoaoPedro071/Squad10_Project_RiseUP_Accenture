@@ -7,7 +7,9 @@ type ExperienceDisplayProps = {
   state: DisplayState;
 };
 
-export default function ExperienceDisplay({ state }: ExperienceDisplayProps) {
+export default function ExperienceDisplay({
+  state,
+}: ExperienceDisplayProps) {
   const [failedId, setFailedId] = useState<string | null>(null);
 
   // Tela desligada: preto total.
@@ -21,7 +23,7 @@ export default function ExperienceDisplay({ state }: ExperienceDisplayProps) {
     );
   }
 
-  // Aguardando: ninguém atribuiu nada ainda.
+  // Aguardando uma experiência.
   if (state.kind === "waiting") {
     return (
       <main className="flex h-screen flex-col items-center justify-center gap-6">
@@ -29,14 +31,18 @@ export default function ExperienceDisplay({ state }: ExperienceDisplayProps) {
           aria-hidden="true"
           className="h-4 w-4 rounded-full bg-accent motion-safe:animate-pulse"
         />
-        <p className="text-2xl text-foreground/70">Aguardando experiência...</p>
+
+        <p className="text-2xl text-foreground/70">
+          Aguardando experiência...
+        </p>
       </main>
     );
   }
 
-  // Falha: pedida pelo painel ou imagem que não carregou.
+  // Falha de carregamento ou erro solicitado pelo controlador.
   const imageFailed =
-    state.kind === "showing" && failedId === state.experience.id;
+    state.kind === "showing" &&
+    failedId === state.experience.id;
 
   if (state.kind === "error" || imageFailed) {
     return (
@@ -44,14 +50,16 @@ export default function ExperienceDisplay({ state }: ExperienceDisplayProps) {
         <p className="text-2xl text-foreground/70">
           Não foi possível carregar o conteúdo.
         </p>
+
         <p className="text-sm text-foreground/50">
-          A equipe foi avisada. Em instantes tentaremos novamente.
+          Verifique a conexão da tela ou selecione outra
+          experiência no painel.
         </p>
       </main>
     );
   }
 
-  // Exibindo: imagem ou página web.
+  // Exibição de imagem ou página web.
   const { experience } = state;
 
   if (experience.type === "image") {
