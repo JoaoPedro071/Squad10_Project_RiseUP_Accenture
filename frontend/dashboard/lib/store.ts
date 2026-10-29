@@ -1,16 +1,26 @@
-import { clients as seedClients, experiences as seedExperiences } from "@/lib/mock-data";
+import {
+  clients as seedClients,
+  experiences as seedExperiences,
+} from "@/lib/mock-data";
 import type { ExperienceInput } from "@/lib/validation";
 import type { Client } from "@/types/client";
 import type { DisplayState } from "@/types/display";
 import type { Experience } from "@/types/experience";
+import { planFocus } from "@/lib/focus";
+import type { FocusState } from "@/types/focus";
 
-type Store = { experiences: Experience[]; clients: Client[] };
+type Store = {
+  experiences: Experience[];
+  clients: Client[];
+  focus: FocusState | null;
+};
 
 const globalForStore = globalThis as unknown as { __experienceStore?: Store };
 
 const store: Store = (globalForStore.__experienceStore ??= {
   experiences: structuredClone(seedExperiences),
   clients: structuredClone(seedClients),
+  focus: null
 });
 
 export function listExperiences(): Experience[] {
@@ -58,4 +68,41 @@ export function createExperience(input: ExperienceInput): Experience {
   };
   store.experiences.push(experience);
   return experience;
+}
+
+export function getFocus(): FocusState | null {
+  return store.focus ?? null;
+}
+
+export function startFocus(
+  clientId: string,
+): FocusState | "not_found" | "offline" | "already_active" {
+  if (store.focus) return "already_active";
+
+  const plan = planFocus(store.clients, clientId);
+  if (!plan) return "not_found";
+  if (plan.focused.status === "offline") return "offline";
+
+  // Só apaga as que estavam ligadas; as já desligadas continuam como estão.
+  plan.toDarken.forEach((c) => {
+    c.displayOff = true;
+  });
+
+  store.focus = {
+    clientId,
+    room: plan.focused.room,
+    affectedIds: plan.toDarken.map((c) => c.id),
+    offlineIds: plan.offline.map((c) => c.id),
+  };
+  return store.focus;
+}
+
+export function endFocus(): boolean {
+  if (!store.focus) return false;
+  for (const id of store.focus.affectedIds) {
+    const client = store.clients.find((c) => c.id === id);
+    if (client) client.displayOff = false;
+  }
+  store.focus = null;
+  return true;
 }

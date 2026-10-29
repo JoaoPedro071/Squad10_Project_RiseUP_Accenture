@@ -53,6 +53,7 @@ export const clients: Client[] = [
   {
     id: "cli-1",
     name: "Monitor Entrada",
+    room: "Recepção",
     status: "online",
     orientation: "landscape",
     currentExperienceId: "exp-1",
@@ -61,6 +62,7 @@ export const clients: Client[] = [
   {
     id: "cli-2",
     name: "TV Sala de Reunião",
+    room: "Sala de Reunião",
     status: "online",
     orientation: "landscape",
     currentExperienceId: null,
@@ -69,6 +71,7 @@ export const clients: Client[] = [
   {
     id: "cli-3",
     name: "Tablet Recepção",
+    room: "Recepção",
     status: "online",
     orientation: "portrait",
     currentExperienceId: "exp-4",
@@ -77,6 +80,7 @@ export const clients: Client[] = [
   {
     id: "cli-4",
     name: "Monitor Touch Central",
+    room: "Sala Central",
     status: "offline",
     orientation: "landscape",
     currentExperienceId: null,

@@ -1,6 +1,7 @@
 import type { ExperienceInput, FieldErrors } from "@/lib/validation";
 import type { Client } from "@/types/client";
 import type { Experience } from "@/types/experience";
+import type { FocusState } from "@/types/focus";
 
 export class ValidationError extends Error {
   fieldErrors: FieldErrors;
@@ -13,7 +14,7 @@ export class ValidationError extends Error {
 
 async function send<T>(
   url: string,
-  method: "POST" | "PUT",
+    method: "POST" | "PUT" | "DELETE",
   body: unknown,
 ): Promise<T> {
   const response = await fetch(url, {
@@ -42,4 +43,14 @@ export function assignExperience(clientId: string, experienceId: string) {
 
 export function createExperience(input: ExperienceInput) {
   return send<Experience>("/api/experiences", "POST", input);
+}
+
+export type FocusResponse = { focus: FocusState | null; clients: Client[] };
+
+export function startFocus(clientId: string) {
+  return send<FocusResponse>("/api/focus", "POST", { clientId });
+}
+
+export function endFocus() {
+  return send<FocusResponse>("/api/focus", "DELETE", undefined);
 }

@@ -1,11 +1,12 @@
 import ClientsBoard from "@/components/ClientsBoard";
-import { listClients, listExperiences } from "@/lib/store";
+import { getFocus, listClients, listExperiences } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
 export default function ClientsPage() {
   const clients = listClients();
   const experiences = listExperiences();
+  const focus = getFocus();
 
   return (
     <section>
@@ -13,7 +14,11 @@ export default function ClientsPage() {
       {clients.length === 0 ? (
         <p>Nenhuma tela conectada.</p>
       ) : (
-        <ClientsBoard initialClients={clients} experiences={experiences} />
+        <ClientsBoard
+          initialClients={clients}
+          experiences={experiences}
+          initialFocus={focus}
+        />
       )}
     </section>
   );

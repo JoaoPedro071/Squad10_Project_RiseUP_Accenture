@@ -1,5 +1,6 @@
 import type { Client } from "@/types/client";
 import type { Experience } from "@/types/experience";
+import { orientationLabel } from "@/lib/orientation";
 import StatusBadge from "./StatusBadge";
 
 const clientAppUrl =
@@ -11,6 +12,8 @@ type ClientCardProps = {
   busy: boolean;
   onToggleDisplay: () => void;
   onChangeExperience: () => void;
+  focusActive: boolean;
+  onFocus: () => void;
 };
 
 export default function ClientCard({
@@ -19,6 +22,8 @@ export default function ClientCard({
   busy,
   onToggleDisplay,
   onChangeExperience,
+  focusActive,
+  onFocus,
 }: ClientCardProps) {
   const status =
     client.status === "offline"
@@ -40,7 +45,7 @@ export default function ClientCard({
         {current ? current.title : "Sem experiência configurada"}
       </p>
       <p className="mt-3 text-xs text-foreground/60">
-        {client.orientation === "landscape" ? "Paisagem" : "Retrato"}
+        {client.room} · {orientationLabel[client.orientation]}
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
@@ -62,6 +67,14 @@ export default function ClientCard({
             : client.displayOff
               ? "Ligar tela"
               : "Desligar tela"}
+        </button>
+        <button
+          type="button"
+          onClick={onFocus}
+          disabled={unavailable || client.displayOff || focusActive}
+          className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Modo foco
         </button>
         <a
           href={`${clientAppUrl}/?client=${client.id}`}
