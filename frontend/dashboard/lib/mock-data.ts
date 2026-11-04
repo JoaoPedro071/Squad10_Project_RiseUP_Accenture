@@ -58,6 +58,9 @@ export const clients: Client[] = [
     orientation: "landscape",
     currentExperienceId: "exp-1",
     displayOff: false,
+    x: 25,
+    y: 30,
+    movable: false,
   },
   {
     id: "cli-2",
@@ -67,6 +70,9 @@ export const clients: Client[] = [
     orientation: "landscape",
     currentExperienceId: null,
     displayOff: true,
+    x: 75,
+    y: 30,
+    movable: false,
   },
   {
     id: "cli-3",
@@ -76,6 +82,9 @@ export const clients: Client[] = [
     orientation: "portrait",
     currentExperienceId: "exp-4",
     displayOff: false,
+    x: 25,
+    y: 72,
+    movable: true,
   },
   {
     id: "cli-4",
@@ -85,5 +94,8 @@ export const clients: Client[] = [
     orientation: "landscape",
     currentExperienceId: null,
     displayOff: false,
+    x: 75,
+    y: 72,
+    movable: true,
   },
 ];

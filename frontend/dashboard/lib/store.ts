@@ -20,7 +20,7 @@ const globalForStore = globalThis as unknown as { __experienceStore?: Store };
 const store: Store = (globalForStore.__experienceStore ??= {
   experiences: structuredClone(seedExperiences),
   clients: structuredClone(seedClients),
-  focus: null
+  focus: null,
 });
 
 export function listExperiences(): Experience[] {
@@ -37,7 +37,9 @@ export function findExperience(id: string): Experience | undefined {
 
 export function updateClient(
   id: string,
-  patch: Partial<Pick<Client, "currentExperienceId" | "displayOff">>,
+  patch: Partial<
+    Pick<Client, "currentExperienceId" | "displayOff" | "x" | "y">
+  >,
 ): Client | null {
   const client = store.clients.find((c) => c.id === id);
   if (!client) return null;

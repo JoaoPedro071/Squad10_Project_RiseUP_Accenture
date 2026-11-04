@@ -58,3 +58,14 @@ export function startFocus(clientId: string) {
 export function endFocus() {
   return send<FocusResponse>("/api/focus", "DELETE", undefined);
 }
+
+export function moveClient(clientId: string, x: number, y: number) {
+  return send<Client>(`/api/clients/${clientId}/position`, "PUT", { x, y });
+}
+
+// Estado completo (telas + modo foco), usado na atualização periódica da planta.
+export async function fetchState(): Promise<FocusResponse> {
+  const response = await fetch("/api/focus", { cache: "no-store" });
+  if (!response.ok) throw new Error("Falha na requisição");
+  return response.json() as Promise<FocusResponse>;
+}
