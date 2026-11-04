@@ -14,7 +14,7 @@ export class ValidationError extends Error {
 
 async function send<T>(
   url: string,
-    method: "POST" | "PUT" | "DELETE",
+  method: "POST" | "PUT" | "DELETE",
   body: unknown,
 ): Promise<T> {
   const response = await fetch(url, {
@@ -34,11 +34,15 @@ async function send<T>(
 }
 
 export function setDisplayOff(clientId: string, displayOff: boolean) {
-  return send<Client>(`/api/clients/${clientId}/display`, "PUT", { displayOff });
+  return send<Client>(`/api/clients/${clientId}/display`, "PUT", {
+    displayOff,
+  });
 }
 
 export function assignExperience(clientId: string, experienceId: string) {
-  return send<Client>(`/api/clients/${clientId}/assignment`, "PUT", { experienceId });
+  return send<Client>(`/api/clients/${clientId}/assignment`, "PUT", {
+    experienceId,
+  });
 }
 
 export function createExperience(input: ExperienceInput) {

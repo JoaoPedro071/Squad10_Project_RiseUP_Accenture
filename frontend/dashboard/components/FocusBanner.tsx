@@ -28,13 +28,14 @@ export default function FocusBanner({
           Modo foco ativo
         </p>
         <p className="mt-1 text-sm text-foreground/80">
-          Apresentando em {nameOf(focus.clientId)} ({focus.room}). Telas
-          apagadas: {focus.affectedIds.length > 0 ? list(focus.affectedIds) : "nenhuma"}.
+          Apresentando em {nameOf(focus.clientId)}. Telas apagadas:{" "}
+          {focus.affectedIds.length > 0 ? list(focus.affectedIds) : "nenhuma"}.
         </p>
         {focus.offlineIds.length > 0 && (
           <p className="mt-1 text-sm text-yellow-300">
             <span aria-hidden="true">⚠ </span>
-            Parcial: não foi possível apagar (offline): {list(focus.offlineIds)}.
+            Parcial: não foi possível apagar (offline): {list(focus.offlineIds)}
+            .
           </p>
         )}
       </div>

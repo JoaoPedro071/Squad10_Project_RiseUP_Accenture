@@ -90,7 +90,6 @@ export function startFocus(
 
   store.focus = {
     clientId,
-    room: plan.focused.room,
     affectedIds: plan.toDarken.map((c) => c.id),
     offlineIds: plan.offline.map((c) => c.id),
   };
