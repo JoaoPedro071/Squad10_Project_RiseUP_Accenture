@@ -4,13 +4,25 @@ type StatusBadgeProps = {
 };
 
 const config = {
-  online: { icon: "●", label: "Online", style: "text-green-400 border-green-400/50" },
-  offline: { icon: "○", label: "Offline", style: "text-red-400 border-red-400/50" },
-  standby: { icon: "■", label: "Tela desligada", style: "text-yellow-300 border-yellow-300/50" },
+  online: {
+    icon: "●",
+    label: "Online",
+    style: "text-green-400 border-green-400/50",
+  },
+  offline: {
+    icon: "○",
+    label: "Offline",
+    style: "text-red-400 border-red-400/50",
+  },
+  standby: {
+    icon: "■",
+    label: "Tela desligada",
+    style: "text-yellow-300 border-yellow-300/50",
+  },
 };
 
 const sizes = {
-  sm: "px-1.5 py-0.5 text-[10px]",
+  sm: "px-1.5 py-0.5 text-[clamp(0.65rem,0.8vw,1rem)]",
   md: "px-2 py-1 text-xs",
 };
 

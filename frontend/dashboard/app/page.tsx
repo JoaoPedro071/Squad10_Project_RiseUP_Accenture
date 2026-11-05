@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function Home() {
   return (
-    <section>
+    <section className="flex min-h-0 flex-1 flex-col">
       <h1 className="sr-only">Planta do escritório</h1>
       <FloorPlan
         initialClients={listClients()}

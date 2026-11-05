@@ -18,6 +18,12 @@ const KEY_STEP = 2; // % por seta; com Shift anda 10
 const LOCKED_MESSAGE =
   "Esta tela está travada. Use o botão de trava no card para destravar.";
 
+// Tamanhos que acompanham a largura da tela (mínimo, ideal, máximo).
+const CARD_WIDTH = "clamp(8.5rem, 13vw, 18rem)";
+const nameText = "text-[clamp(0.85rem,1.1vw,1.5rem)] font-bold leading-tight";
+const detailText = "text-[clamp(0.7rem,0.9vw,1.2rem)]";
+const cardPadding = "p-[clamp(0.5rem,0.8vw,1.1rem)]";
+
 // Mantém o marcador inteiro dentro do container.
 const clamp = (value: number) => Math.min(95, Math.max(5, value));
 const round = (value: number) => Math.round(value * 10) / 10;
@@ -66,7 +72,8 @@ export default function FloorPlan({
   }
 
   function handleSelect(client: Client) {
-    if (suppressClick.current) return;
+    // No modo edição o clique não abre o modal.
+    if (editMode || suppressClick.current) return;
     setSelectedId(client.id);
   }
 
@@ -152,7 +159,7 @@ export default function FloorPlan({
   }
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col">
       {focus && (
         <FocusBanner
           focus={focus}
@@ -188,7 +195,8 @@ export default function FloorPlan({
       {editMode && (
         <p className="mb-2 text-xs text-foreground/60">
           Arraste os monitores ou use as setas do teclado (Shift anda mais). A
-          posição é salva ao soltar. Monitores travados não se movem.
+          posição é salva ao soltar. Monitores travados não se movem, e o menu
+          de opções só abre depois de concluir a edição.
         </p>
       )}
 
@@ -196,7 +204,7 @@ export default function FloorPlan({
         ref={planRef}
         role="group"
         aria-label="Planta do escritório"
-        className={`relative aspect-video w-full rounded-lg border-2 border-white ${
+        className={`relative min-h-72 w-full flex-1 rounded-lg border-2 border-white ${
           editMode ? "bg-accent/5" : ""
         }`}
       >
@@ -211,8 +219,12 @@ export default function FloorPlan({
           return (
             <div
               key={client.id}
-              style={{ left: `${position.x}%`, top: `${position.y}%` }}
-              className={`absolute flex w-40 max-w-[40%] -translate-x-1/2 -translate-y-1/2 flex-col rounded-md border border-border bg-surface text-xs ${
+              style={{
+                left: `${position.x}%`,
+                top: `${position.y}%`,
+                width: CARD_WIDTH,
+              }}
+              className={`absolute flex max-w-[40%] -translate-x-1/2 -translate-y-1/2 flex-col rounded-md border border-border bg-surface ${
                 dragging ? "z-10" : ""
               }`}
             >
@@ -224,18 +236,18 @@ export default function FloorPlan({
                 onPointerUp={() => handlePointerUp(client)}
                 onPointerCancel={handlePointerCancel}
                 onKeyDown={(e) => handleKeyDown(e, client)}
-                aria-haspopup="dialog"
-                className={`flex min-h-11 w-full flex-col items-start gap-1 rounded-md p-2 text-left focus-visible:outline-2 focus-visible:outline-accent ${
+                aria-haspopup={editMode ? undefined : "dialog"}
+                className={`flex min-h-11 w-full flex-col items-start gap-1 rounded-md ${cardPadding} text-left focus-visible:outline-2 focus-visible:outline-accent ${
                   draggable ? "cursor-grab touch-none select-none" : ""
                 }`}
               >
                 <StatusBadge status={clientStatus(client)} size="sm" />
-                <span className="text-sm font-bold">{client.name}</span>
-                <span className="text-foreground/70">
+                <span className={nameText}>{client.name}</span>
+                <span className={`${detailText} text-foreground/70`}>
                   {current ? current.title : "Sem experiência"}
                 </span>
                 {focus?.clientId === client.id && (
-                  <span className="text-yellow-300">
+                  <span className={`${detailText} text-yellow-300`}>
                     <span aria-hidden="true">◉ </span>
                     Em foco
                   </span>
@@ -247,7 +259,7 @@ export default function FloorPlan({
                   type="button"
                   onClick={() => setLockTargetId(client.id)}
                   disabled={board.busyId === client.id}
-                  className="min-h-11 w-full rounded-b-md border-t border-border px-2 text-left hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+                  className={`min-h-11 w-full rounded-b-md border-t border-border px-[clamp(0.5rem,0.8vw,1.1rem)] text-left ${detailText} hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   <span aria-hidden="true">{client.locked ? "🔒 " : "🔓 "}</span>
                   {client.locked ? "Travada" : "Livre"}
@@ -270,7 +282,6 @@ export default function FloorPlan({
           experiences={experiences}
           busy={board.busyId === selected.id}
           focusActive={focus !== null || board.focusBusy}
-          editMode={editMode}
           onClose={() => setSelectedId(null)}
           onAssign={(experienceId) => {
             board.assign(selected.id, experienceId);
@@ -278,7 +289,6 @@ export default function FloorPlan({
           }}
           onToggleDisplay={() => board.toggleDisplay(selected)}
           onFocus={() => setFocusTargetId(selected.id)}
-          onToggleLock={() => setLockTargetId(selected.id)}
         />
       )}
 
@@ -300,6 +310,6 @@ export default function FloorPlan({
           onConfirm={handleConfirmLock}
         />
       )}
-    </>
+    </div>
   );
 }
