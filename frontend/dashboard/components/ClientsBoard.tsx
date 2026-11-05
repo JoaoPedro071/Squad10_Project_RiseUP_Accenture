@@ -150,7 +150,7 @@ export default function ClientsBoard({
 
       {editingClient && (
         <ExperienceModal
-          key={editingClient.id}
+          key={`experience-${editingClient.id}`}
           client={editingClient}
           experiences={experiences}
           onClose={() => setEditingId(null)}
@@ -160,7 +160,7 @@ export default function ClientsBoard({
 
       {focusTarget && (
         <FocusModal
-          key={focusTarget.id}
+          key={`focus-${focusTarget.id}`}
           client={focusTarget}
           clients={clients}
           onClose={() => setFocusTargetId(null)}

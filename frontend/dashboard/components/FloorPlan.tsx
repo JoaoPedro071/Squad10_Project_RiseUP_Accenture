@@ -77,7 +77,10 @@ export default function FloorPlan({
     setSelectedId(client.id);
   }
 
-  function handlePointerDown(event: PointerEvent<HTMLButtonElement>, client: Client) {
+  function handlePointerDown(
+    event: PointerEvent<HTMLButtonElement>,
+    client: Client,
+  ) {
     if (!editMode) return;
     if (client.locked) {
       pressed.current = { id: client.id, x: event.clientX, y: event.clientY };
@@ -87,7 +90,10 @@ export default function FloorPlan({
     setDrag({ id: client.id, x: client.x, y: client.y });
   }
 
-  function handlePointerMove(event: PointerEvent<HTMLButtonElement>, client: Client) {
+  function handlePointerMove(
+    event: PointerEvent<HTMLButtonElement>,
+    client: Client,
+  ) {
     const press = pressed.current;
     if (press?.id === client.id) {
       if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > 8) {
@@ -128,7 +134,10 @@ export default function FloorPlan({
   }
 
   // Alternativa por teclado ao arrastar: setas (Shift anda mais).
-  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, client: Client) {
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    client: Client,
+  ) {
     if (!editMode) return;
     const direction = arrows[event.key];
     if (!direction) return;
@@ -261,7 +270,9 @@ export default function FloorPlan({
                   disabled={board.busyId === client.id}
                   className={`min-h-11 w-full rounded-b-md border-t border-border px-[clamp(0.5rem,0.8vw,1.1rem)] text-left ${detailText} hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  <span aria-hidden="true">{client.locked ? "🔒 " : "🔓 "}</span>
+                  <span aria-hidden="true">
+                    {client.locked ? "🔒 " : "🔓 "}
+                  </span>
                   {client.locked ? "Travada" : "Livre"}
                   <span className="sr-only">
                     {" "}
@@ -277,7 +288,7 @@ export default function FloorPlan({
 
       {selected && (
         <ScreenModal
-          key={selected.id}
+          key={`screen-${selected.id}`}
           client={selected}
           experiences={experiences}
           busy={board.busyId === selected.id}
@@ -294,7 +305,7 @@ export default function FloorPlan({
 
       {focusTarget && (
         <FocusModal
-          key={focusTarget.id}
+          key={`focus-${focusTarget.id}`}
           client={focusTarget}
           clients={clients}
           onClose={() => setFocusTargetId(null)}
@@ -304,7 +315,7 @@ export default function FloorPlan({
 
       {lockTarget && (
         <LockModal
-          key={lockTarget.id}
+          key={`lock-${lockTarget.id}`}
           client={lockTarget}
           onClose={() => setLockTargetId(null)}
           onConfirm={handleConfirmLock}
