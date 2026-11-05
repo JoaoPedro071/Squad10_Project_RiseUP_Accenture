@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isIncompatible, orientationLabel } from "@/lib/orientation";
 import { clientStatus } from "@/lib/status";
 import type { Client } from "@/types/client";
@@ -15,33 +15,42 @@ const secondaryButton =
 const primaryButton =
   "min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 
-type ScreenPanelProps = {
+type ScreenModalProps = {
   client: Client;
   experiences: Experience[];
   busy: boolean;
   focusActive: boolean;
+  editMode: boolean;
   onClose: () => void;
   onAssign: (experienceId: string) => void;
   onToggleDisplay: () => void;
   onFocus: () => void;
   onToggleLock: () => void;
-  editMode: boolean;
 };
 
-export default function ScreenPanel({
+export default function ScreenModal({
   client,
   experiences,
   busy,
   focusActive,
+  editMode,
   onClose,
   onAssign,
   onToggleDisplay,
   onFocus,
   onToggleLock,
-  editMode,
-}: ScreenPanelProps) {
+}: ScreenModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   // Experiência incompatível aguardando confirmação.
   const [pending, setPending] = useState<Experience | null>(null);
+
+  // Abre o <dialog> assim que o componente aparece.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) {
+      dialog.showModal();
+    }
+  }, []);
 
   const offline = client.status === "offline";
   const disabled = busy || offline;
@@ -64,9 +73,16 @@ export default function ScreenPanel({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-surface p-4">
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      aria-labelledby="screen-title"
+      className="m-auto max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-surface p-6 text-foreground backdrop:bg-black/60"
+    >
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-lg font-semibold">{client.name}</h2>
+        <h2 id="screen-title" className="text-lg font-semibold">
+          {client.name}
+        </h2>
         <StatusBadge status={clientStatus(client)} />
       </div>
       <p className="mt-2 text-sm text-foreground/80">
@@ -166,17 +182,12 @@ export default function ScreenPanel({
         >
           <p>
             <span aria-hidden="true">⚠ </span>
-            {pending.title} é em{" "}
-            {orientationLabel[pending.orientation].toLowerCase()} e a tela está
-            em {orientationLabel[client.orientation].toLowerCase()}. O conteúdo
-            pode aparecer cortado ou com bordas.
+            {pending.title} é em {orientationLabel[pending.orientation].toLowerCase()}{" "}
+            e a tela está em {orientationLabel[client.orientation].toLowerCase()}. O
+            conteúdo pode aparecer cortado ou com bordas.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={applyPending}
-              className={primaryButton}
-            >
+            <button type="button" onClick={applyPending} className={primaryButton}>
               Aplicar assim mesmo
             </button>
             <button
@@ -190,13 +201,11 @@ export default function ScreenPanel({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onClose}
-        className={`${secondaryButton} mt-4`}
-      >
-        Fechar painel
-      </button>
-    </div>
+      <div className="mt-6 flex justify-end">
+        <button type="button" onClick={onClose} className={secondaryButton}>
+          Fechar
+        </button>
+      </div>
+    </dialog>
   );
 }

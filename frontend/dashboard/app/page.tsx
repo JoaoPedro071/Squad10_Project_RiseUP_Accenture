@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default function Home() {
   return (
     <section>
-      <h1 className="mb-4 text-2xl font-bold">Planta</h1>
+      <h1 className="sr-only">Planta do escritório</h1>
       <FloorPlan
         initialClients={listClients()}
         initialFocus={getFocus()}
