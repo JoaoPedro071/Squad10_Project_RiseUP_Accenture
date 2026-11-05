@@ -7,6 +7,7 @@ import {
   assignExperience,
   endFocus,
   fetchState,
+  lockClient,
   moveClient,
   setDisplayOff,
   startFocus,
@@ -91,7 +92,9 @@ export function useBoard(
     setBusyId(clientId);
     setMessage("Atualizando...");
     try {
-      const updated = await track(() => assignExperience(clientId, experienceId));
+      const updated = await track(() =>
+        assignExperience(clientId, experienceId),
+      );
       replaceClient(updated);
       setMessage("Concluído. A tela atualiza em instantes.");
     } catch {
@@ -115,6 +118,24 @@ export function useBoard(
     } catch {
       if (previous) replaceClient(previous);
       setMessage("Não foi possível salvar a posição. Tente novamente.");
+    }
+  }
+
+  async function lock(clientId: string, locked: boolean) {
+    setBusyId(clientId);
+    setMessage("Atualizando...");
+    try {
+      const updated = await track(() => lockClient(clientId, locked));
+      replaceClient(updated);
+      setMessage(
+        locked
+          ? "Concluído. Posição travada."
+          : "Concluído. Posição destravada.",
+      );
+    } catch {
+      setMessage("Não foi possível alterar o travamento. Tente novamente.");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -162,6 +183,8 @@ export function useBoard(
     toggleDisplay,
     assign,
     move,
+    lock,
+    notify: setMessage,
     startFocusFor,
     exitFocus,
   };

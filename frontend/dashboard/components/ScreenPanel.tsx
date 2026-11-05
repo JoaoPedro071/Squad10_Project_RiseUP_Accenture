@@ -24,6 +24,8 @@ type ScreenPanelProps = {
   onAssign: (experienceId: string) => void;
   onToggleDisplay: () => void;
   onFocus: () => void;
+  onToggleLock: () => void;
+  editMode: boolean;
 };
 
 export default function ScreenPanel({
@@ -35,6 +37,8 @@ export default function ScreenPanel({
   onAssign,
   onToggleDisplay,
   onFocus,
+  onToggleLock,
+  editMode,
 }: ScreenPanelProps) {
   // Experiência incompatível aguardando confirmação.
   const [pending, setPending] = useState<Experience | null>(null);
@@ -69,8 +73,14 @@ export default function ScreenPanel({
         {current ? current.title : "Sem experiência configurada"}
       </p>
       <p className="mt-1 text-xs text-foreground/60">
-        {orientationLabel[client.orientation]} ·{" "}
-        {client.movable ? "Posição móvel" : "Posição fixa"}
+        {orientationLabel[client.orientation]}
+        {editMode && (
+          <>
+            {" · "}
+            <span aria-hidden="true">{client.locked ? "🔒 " : "🔓 "}</span>
+            {client.locked ? "Posição travada" : "Posição livre"}
+          </>
+        )}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -94,6 +104,16 @@ export default function ScreenPanel({
         >
           Modo foco
         </button>
+        {editMode && (
+          <button
+            type="button"
+            onClick={onToggleLock}
+            disabled={busy}
+            className={secondaryButton}
+          >
+            {client.locked ? "Destravar posição" : "Travar posição"}
+          </button>
+        )}
         <a
           href={`${clientAppUrl}/?client=${client.id}`}
           target="_blank"
@@ -146,12 +166,17 @@ export default function ScreenPanel({
         >
           <p>
             <span aria-hidden="true">⚠ </span>
-            {pending.title} é em {orientationLabel[pending.orientation].toLowerCase()}{" "}
-            e a tela está em {orientationLabel[client.orientation].toLowerCase()}. O
-            conteúdo pode aparecer cortado ou com bordas.
+            {pending.title} é em{" "}
+            {orientationLabel[pending.orientation].toLowerCase()} e a tela está
+            em {orientationLabel[client.orientation].toLowerCase()}. O conteúdo
+            pode aparecer cortado ou com bordas.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" onClick={applyPending} className={primaryButton}>
+            <button
+              type="button"
+              onClick={applyPending}
+              className={primaryButton}
+            >
               Aplicar assim mesmo
             </button>
             <button
@@ -165,7 +190,11 @@ export default function ScreenPanel({
         </div>
       )}
 
-      <button type="button" onClick={onClose} className={`${secondaryButton} mt-4`}>
+      <button
+        type="button"
+        onClick={onClose}
+        className={`${secondaryButton} mt-4`}
+      >
         Fechar painel
       </button>
     </div>

@@ -8,5 +8,5 @@ export type Client = {
   displayOff: boolean;
   x: number; // posição na planta, em % da largura (0 a 100)
   y: number; // posição na planta, em % da altura (0 a 100)
-  movable: boolean; // true = pode ser reposicionada na planta
+  locked: boolean; // true = posição travada (não pode ser movida)
 };

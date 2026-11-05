@@ -38,7 +38,7 @@ export function findExperience(id: string): Experience | undefined {
 export function updateClient(
   id: string,
   patch: Partial<
-    Pick<Client, "currentExperienceId" | "displayOff" | "x" | "y">
+    Pick<Client, "currentExperienceId" | "displayOff" | "x" | "y" | "locked">
   >,
 ): Client | null {
   const client = store.clients.find((c) => c.id === id);

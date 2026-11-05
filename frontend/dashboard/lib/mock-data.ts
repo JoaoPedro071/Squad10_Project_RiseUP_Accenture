@@ -60,7 +60,7 @@ export const clients: Client[] = [
     displayOff: false,
     x: 25,
     y: 30,
-    movable: false,
+    locked: true,
   },
   {
     id: "cli-2",
@@ -72,7 +72,7 @@ export const clients: Client[] = [
     displayOff: true,
     x: 75,
     y: 30,
-    movable: false,
+    locked: true,
   },
   {
     id: "cli-3",
@@ -84,7 +84,7 @@ export const clients: Client[] = [
     displayOff: false,
     x: 25,
     y: 72,
-    movable: true,
+    locked: false,
   },
   {
     id: "cli-4",
@@ -96,6 +96,6 @@ export const clients: Client[] = [
     displayOff: false,
     x: 75,
     y: 72,
-    movable: true,
+    locked: false,
   },
 ];

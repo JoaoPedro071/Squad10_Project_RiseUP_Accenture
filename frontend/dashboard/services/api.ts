@@ -69,3 +69,7 @@ export async function fetchState(): Promise<FocusResponse> {
   if (!response.ok) throw new Error("Falha na requisição");
   return response.json() as Promise<FocusResponse>;
 }
+
+export function lockClient(clientId: string, locked: boolean) {
+  return send<Client>(`/api/clients/${clientId}/lock`, "PUT", { locked });
+}

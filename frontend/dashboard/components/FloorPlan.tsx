@@ -10,11 +10,14 @@ import type { Experience } from "@/types/experience";
 import type { FocusState } from "@/types/focus";
 import FocusBanner from "./FocusBanner";
 import FocusModal from "./FocusModal";
+import LockModal from "./LockModal";
 import ScreenPanel from "./ScreenPanel";
 import StatusBadge from "./StatusBadge";
 
 const POLL_MS = 3000;
 const KEY_STEP = 2; // % por seta; com Shift anda 10
+const LOCKED_MESSAGE =
+  "Esta tela está travada. Destrave no painel para movê-la.";
 
 // Mantém o marcador inteiro dentro do container.
 const clamp = (value: number) => Math.min(95, Math.max(5, value));
@@ -44,6 +47,7 @@ export default function FloorPlan({
   const planRef = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focusTargetId, setFocusTargetId] = useState<string | null>(null);
+  const [lockTargetId, setLockTargetId] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(
     null,
@@ -51,6 +55,7 @@ export default function FloorPlan({
 
   const selected = clients.find((c) => c.id === selectedId);
   const focusTarget = clients.find((c) => c.id === focusTargetId);
+  const lockTarget = clients.find((c) => c.id === lockTargetId);
   const online = clients.filter((c) => c.status === "online").length;
   const activeCount = experiences.filter((e) => e.active).length;
 
@@ -58,13 +63,23 @@ export default function FloorPlan({
     return drag?.id === client.id ? drag : client;
   }
 
-  function handlePointerDown(event: PointerEvent<HTMLButtonElement>, client: Client) {
-    if (!editMode || !client.movable) return;
+  function handlePointerDown(
+    event: PointerEvent<HTMLButtonElement>,
+    client: Client,
+  ) {
+    if (!editMode) return;
+    if (client.locked) {
+      board.notify(LOCKED_MESSAGE);
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     setDrag({ id: client.id, x: client.x, y: client.y });
   }
 
-  function handlePointerMove(event: PointerEvent<HTMLButtonElement>, client: Client) {
+  function handlePointerMove(
+    event: PointerEvent<HTMLButtonElement>,
+    client: Client,
+  ) {
     if (drag?.id !== client.id) return;
     const rect = planRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -86,11 +101,18 @@ export default function FloorPlan({
   }
 
   // Alternativa por teclado ao arrastar: setas (Shift anda mais).
-  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, client: Client) {
-    if (!editMode || !client.movable) return;
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    client: Client,
+  ) {
+    if (!editMode) return;
     const direction = arrows[event.key];
     if (!direction) return;
     event.preventDefault();
+    if (client.locked) {
+      board.notify(LOCKED_MESSAGE);
+      return;
+    }
     const step = event.shiftKey ? 10 : KEY_STEP;
     board.move(
       client.id,
@@ -103,6 +125,12 @@ export default function FloorPlan({
     const clientId = focusTargetId;
     setFocusTargetId(null);
     if (clientId) board.startFocusFor(clientId);
+  }
+
+  function handleConfirmLock() {
+    const target = lockTarget;
+    setLockTargetId(null);
+    if (target) board.lock(target.id, !target.locked);
   }
 
   return (
@@ -133,9 +161,9 @@ export default function FloorPlan({
 
       {editMode && (
         <p className="mb-3 text-sm text-foreground/70">
-          Arraste as telas móveis ou selecione uma e use as setas do teclado
-          (Shift anda mais). A posição é salva ao soltar. Telas fixas não se
-          movem.
+          Arraste uma tela ou selecione e use as setas do teclado (Shift anda
+          mais). A posição é salva ao soltar. Telas travadas não se movem:
+          destrave no painel.
         </p>
       )}
 
@@ -159,7 +187,7 @@ export default function FloorPlan({
           >
             {clients.map((client) => {
               const position = positionOf(client);
-              const movable = editMode && client.movable;
+              const draggable = editMode && !client.locked;
               const isSelected = selectedId === client.id;
               const current = experiences.find(
                 (e) => e.id === client.currentExperienceId,
@@ -178,8 +206,10 @@ export default function FloorPlan({
                   aria-pressed={isSelected}
                   style={{ left: `${position.x}%`, top: `${position.y}%` }}
                   className={`absolute flex min-h-11 min-w-11 w-36 max-w-[40%] -translate-x-1/2 -translate-y-1/2 flex-col items-start gap-1 rounded-md border bg-surface p-2 text-left text-xs focus-visible:outline-2 focus-visible:outline-accent ${
-                    isSelected ? "border-accent ring-2 ring-accent" : "border-border"
-                  } ${movable ? "cursor-grab touch-none" : ""}`}
+                    isSelected
+                      ? "border-accent ring-2 ring-accent"
+                      : "border-border"
+                  } ${draggable ? "cursor-grab touch-none" : ""}`}
                 >
                   <span className="text-sm font-medium">{client.name}</span>
                   <StatusBadge status={clientStatus(client)} />
@@ -194,8 +224,10 @@ export default function FloorPlan({
                   )}
                   {editMode && (
                     <span className="text-foreground/70">
-                      <span aria-hidden="true">{client.movable ? "↔ " : "🔒 "}</span>
-                      {client.movable ? "Móvel" : "Posição fixa"}
+                      <span aria-hidden="true">
+                        {client.locked ? "🔒 " : "🔓 "}
+                      </span>
+                      {client.locked ? "Travada" : "Livre"}
                     </span>
                   )}
                 </button>
@@ -216,14 +248,27 @@ export default function FloorPlan({
                     onClick={() => setSelectedId(client.id)}
                     aria-pressed={selectedId === client.id}
                     className={`flex min-h-11 w-full flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-left text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent ${
-                      selectedId === client.id ? "border-accent" : "border-border"
+                      selectedId === client.id
+                        ? "border-accent"
+                        : "border-border"
                     }`}
                   >
                     <span>
                       <span className="block font-medium">{client.name}</span>
                       <span className="block text-xs text-foreground/70">
-                        {current ? current.title : "Sem experiência configurada"} ·{" "}
-                        {orientationLabel[client.orientation]}
+                        {current
+                          ? current.title
+                          : "Sem experiência configurada"}{" "}
+                        · {orientationLabel[client.orientation]}
+                        {editMode && (
+                          <>
+                            {" · "}
+                            <span aria-hidden="true">
+                              {client.locked ? "🔒 " : "🔓 "}
+                            </span>
+                            {client.locked ? "Travada" : "Livre"}
+                          </>
+                        )}
                       </span>
                     </span>
                     <StatusBadge status={clientStatus(client)} />
@@ -243,9 +288,13 @@ export default function FloorPlan({
               busy={board.busyId === selected.id}
               focusActive={focus !== null || board.focusBusy}
               onClose={() => setSelectedId(null)}
-              onAssign={(experienceId) => board.assign(selected.id, experienceId)}
+              onAssign={(experienceId) =>
+                board.assign(selected.id, experienceId)
+              }
               onToggleDisplay={() => board.toggleDisplay(selected)}
               onFocus={() => setFocusTargetId(selected.id)}
+              onToggleLock={() => setLockTargetId(selected.id)}
+              editMode={editMode}
             />
           ) : (
             <p className="rounded-lg border border-border bg-surface p-4 text-sm text-foreground/70">
@@ -262,6 +311,15 @@ export default function FloorPlan({
           clients={clients}
           onClose={() => setFocusTargetId(null)}
           onConfirm={handleConfirmFocus}
+        />
+      )}
+
+      {lockTarget && (
+        <LockModal
+          key={lockTarget.id}
+          client={lockTarget}
+          onClose={() => setLockTargetId(null)}
+          onConfirm={handleConfirmLock}
         />
       )}
     </>
