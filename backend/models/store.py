@@ -6,8 +6,9 @@ nao precisam mudar. Como o estado vive no processo, rode com UM worker.
 """
 
 import time
+import uuid
 
-from models.seed import seed_clients, seed_experiences
+from models.seed import seed_clients, seed_experiences, seed_images
 from schemas.client import Client
 from schemas.display import (
     DisplayOff,
@@ -17,6 +18,7 @@ from schemas.display import (
 )
 from schemas.experience import Experience
 from schemas.focus import FocusState
+from schemas.image import Image
 
 
 class InMemoryStore:
@@ -25,6 +27,7 @@ class InMemoryStore:
 
     def reset(self) -> None:
         self._experiences = seed_experiences()
+        self._images = seed_images()
         self._clients = seed_clients()
         self._focus: FocusState | None = None
 
@@ -32,11 +35,17 @@ class InMemoryStore:
     def list_experiences(self) -> list[Experience]:
         return list(self._experiences)
 
+    def list_images(self) -> list[Image]:
+        return list(self._images)
+
     def list_clients(self) -> list[Client]:
         return list(self._clients)
 
     def find_experience(self, experience_id: str) -> Experience | None:
         return next((e for e in self._experiences if e.id == experience_id), None)
+
+    def find_image(self, image_id: str) -> Image | None:
+        return next((i for i in self._images if i.id == image_id), None)
 
     def find_client(self, client_id: str) -> Client | None:
         return next((c for c in self._clients if c.id == client_id), None)
@@ -79,6 +88,27 @@ class InMemoryStore:
         )
         self._experiences.append(experience)
         return experience
+
+    def create_image(self, data: dict) -> Image:
+        image = Image(
+            # uuid evita ids repetidos quando duas imagens sao criadas no mesmo instante.
+            id=f"img-{uuid.uuid4().hex[:8]}",
+            title=str(data["title"]).strip(),
+            description=str(data.get("description") or "").strip(),
+            url=str(data["url"]).strip(),
+            orientation=data["orientation"],
+            active=True,
+        )
+        self._images.append(image)
+        return image
+
+    def set_image_active(self, image_id: str, active: bool) -> Image | None:
+        image = self.find_image(image_id)
+        if image is None:
+            return None
+        image.active = active
+        return image
+
 
     # --- Modo foco: uma tela apresenta e as outras ligadas apagam ---
     def get_focus(self) -> FocusState | None:

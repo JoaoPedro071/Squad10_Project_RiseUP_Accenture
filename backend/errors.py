@@ -8,7 +8,14 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from services.validation import validate_experience
+from services.validation import validate_experience, validate_image
+
+# Rotas de cadastro que respondem com erro por campo mesmo quando o corpo
+# chega vazio ou com JSON invalido.
+FORM_ROUTES = {
+    "/api/experiences": validate_experience,
+    "/api/images": validate_image,
+}
 
 
 class ApiError(Exception):
@@ -39,8 +46,7 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def body_error_handler(request: Request, _: RequestValidationError):
         # Corpo ausente ou JSON invalido.
-        if request.method == "POST" and request.url.path == "/api/experiences":
-            return JSONResponse(
-                {"fieldErrors": validate_experience({})}, status_code=400
-            )
+        validator = FORM_ROUTES.get(request.url.path)
+        if request.method == "POST" and validator is not None:
+            return JSONResponse({"fieldErrors": validator({})}, status_code=400)
         return JSONResponse({"error": "Requisição inválida"}, status_code=422)
