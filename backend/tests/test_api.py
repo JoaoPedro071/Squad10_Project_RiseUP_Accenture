@@ -145,6 +145,38 @@ def test_image_active_errors():
     r = client.put("/api/images/xxx/active", json={"active": False})
     assert r.status_code == 404 and r.json() == {"error": "Imagem não encontrada"}
 
+# ---------- configuracoes (stand-by global) ----------
+
+def test_settings_default_has_no_standby():
+    r = client.get("/api/settings")
+    assert r.status_code == 200
+    assert r.json() == {"standbyImageId": None}
+
+
+def test_set_standby_image_ok_and_clear():
+    r = client.put("/api/settings", json={"standbyImageId": "img-1"})
+    assert r.status_code == 200 and r.json() == {"standbyImageId": "img-1"}
+    assert client.get("/api/settings").json()["standbyImageId"] == "img-1"
+    r = client.put("/api/settings", json={"standbyImageId": None})
+    assert r.status_code == 200 and r.json() == {"standbyImageId": None}
+
+
+def test_set_standby_rejects_unknown_inactive_or_invalid():
+    client.put("/api/images/img-1/active", json={"active": False})
+    for value in ("img-1", "nao-existe", 123):
+        r = client.put("/api/settings", json={"standbyImageId": value})
+        assert r.status_code == 422, value
+        assert r.json() == {"error": "Imagem indisponível"}
+    assert client.get("/api/settings").json()["standbyImageId"] is None  # nada mudou
+
+
+def test_cannot_inactivate_current_standby_image():
+    client.put("/api/settings", json={"standbyImageId": "img-1"})
+    r = client.put("/api/images/img-1/active", json={"active": False})
+    assert r.status_code == 409
+    assert r.json() == {"error": "Esta imagem é o stand-by atual. Escolha outro stand-by antes."}
+    assert client.get("/api/images").json()[0]["active"] is True
+
 def test_assignment_ok_turns_display_on():
     r = client.put("/api/clients/cli-2/assignment", json={"experienceId": "exp-3"})
     assert r.status_code == 200

@@ -19,6 +19,7 @@ from schemas.display import (
 from schemas.experience import Experience
 from schemas.focus import FocusState
 from schemas.image import Image
+from schemas.settings import Settings
 
 
 class InMemoryStore:
@@ -30,6 +31,7 @@ class InMemoryStore:
         self._images = seed_images()
         self._clients = seed_clients()
         self._focus: FocusState | None = None
+        self._settings = Settings()
 
     # --- leitura ---
     def list_experiences(self) -> list[Experience]:
@@ -109,6 +111,13 @@ class InMemoryStore:
         image.active = active
         return image
 
+    # --- configuracoes globais ---
+    def get_settings(self) -> Settings:
+        return self._settings
+
+    def set_standby_image(self, image_id: str | None) -> Settings:
+        self._settings.standby_image_id = image_id
+        return self._settings
 
     # --- Modo foco: uma tela apresenta e as outras ligadas apagam ---
     def get_focus(self) -> FocusState | None:
