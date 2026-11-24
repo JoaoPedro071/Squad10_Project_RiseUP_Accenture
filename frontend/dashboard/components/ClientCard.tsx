@@ -1,83 +1,67 @@
-import type { Client } from "@/types/client";
-import type { Experience } from "@/types/experience";
-import { orientationLabel } from "@/lib/orientation";
+import { CLIENT_APP_URL } from "@/lib/config";
+import { contentLabel, pendingNote } from "@/lib/content";
+import type { Catalog } from "@/lib/content";
+import { screenOrientationText } from "@/lib/orientation";
+import type { Client } from "@/types/api";
 import StatusBadge from "./StatusBadge";
-
-const clientAppUrl =
-  process.env.NEXT_PUBLIC_CLIENT_APP_URL ?? "http://localhost:3001";
 
 type ClientCardProps = {
   client: Client;
-  experiences: Experience[];
+  catalog: Catalog;
   busy: boolean;
-  onToggleDisplay: () => void;
-  onChangeExperience: () => void;
   focusActive: boolean;
+  onConfigure: () => void;
   onFocus: () => void;
 };
 
 export default function ClientCard({
   client,
-  experiences,
+  catalog,
   busy,
-  onToggleDisplay,
-  onChangeExperience,
   focusActive,
+  onConfigure,
   onFocus,
 }: ClientCardProps) {
-  const status =
-    client.status === "offline"
-      ? "offline"
-      : client.displayOff
-        ? "standby"
-        : "online";
-
-  const current = experiences.find((e) => e.id === client.currentExperienceId);
-  const unavailable = busy || client.status === "offline";
+  const note = pendingNote(client);
 
   return (
     <article className="rounded-lg border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-2">
         <h2 className="text-lg font-semibold">{client.name}</h2>
-        <StatusBadge status={status} />
+        <StatusBadge status={client.status} />
       </div>
       <p className="mt-2 text-sm text-foreground/80">
-        {current ? current.title : "Sem experiência configurada"}
+        {contentLabel(client, catalog)}
       </p>
       <p className="mt-3 text-xs text-foreground/60">
-        {client.room} · {orientationLabel[client.orientation]}
+        {screenOrientationText(client)}
       </p>
+      {client.orientationMismatch && (
+        <p className="mt-1 text-xs text-orange-400">
+          <span aria-hidden="true">⚠ </span>
+          A orientação da tela não combina com o conteúdo
+        </p>
+      )}
+      {note && <p className="mt-1 text-xs text-yellow-300">{note}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={onChangeExperience}
-          disabled={unavailable}
+          onClick={onConfigure}
+          disabled={busy}
           className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Trocar experiência
-        </button>
-        <button
-          type="button"
-          onClick={onToggleDisplay}
-          disabled={unavailable}
-          className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {busy
-            ? "Atualizando..."
-            : client.displayOff
-              ? "Ligar tela"
-              : "Desligar tela"}
+          {busy ? "Atualizando..." : "Trocar conteúdo"}
         </button>
         <button
           type="button"
           onClick={onFocus}
-          disabled={unavailable || client.displayOff || focusActive}
+          disabled={busy || client.status === "off" || focusActive}
           className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
           Modo foco
         </button>
         <a
-          href={`${clientAppUrl}/?client=${client.id}`}
+          href={`${CLIENT_APP_URL}/?client=${client.id}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex min-h-11 items-center rounded-md px-3 text-sm text-purple-300 underline hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"

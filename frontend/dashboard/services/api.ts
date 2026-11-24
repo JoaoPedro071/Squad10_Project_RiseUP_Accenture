@@ -1,8 +1,17 @@
-import type { ExperienceInput, FieldErrors } from "@/lib/validation";
-import type { Client } from "@/types/client";
-import type { Experience } from "@/types/experience";
-import type { FocusState } from "@/types/focus";
+// Chamadas ao backend FastAPI. Funciona no navegador e nas páginas do servidor.
+import { API_URL } from "@/lib/config";
+import type { ExperienceInput } from "@/lib/validation";
+import type {
+  Client,
+  ContentUpdate,
+  Experience,
+  FieldErrors,
+  FocusResponse,
+  Image,
+  Settings,
+} from "@/types/api";
 
+/** Erro de cadastro (400): mensagens por campo, em português. */
 export class ValidationError extends Error {
   fieldErrors: FieldErrors;
 
@@ -12,64 +21,62 @@ export class ValidationError extends Error {
   }
 }
 
-async function send<T>(
-  url: string,
-  method: "POST" | "PUT" | "DELETE",
-  body: unknown,
-): Promise<T> {
-  const response = await fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+/** Demais erros: a mensagem vem do backend, em português. */
+export class ApiError extends Error {
+  status: number;
 
-  if (response.status === 400) {
-    const data = await response.json();
-    throw new ValidationError(data.fieldErrors ?? {});
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function request<T>(
+  path: string,
+  method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+  body?: unknown,
+): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
+    method,
+    cache: "no-store",
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (response.status === 204) return undefined as T;
+
+  const data = await response.json().catch(() => null);
+  if (response.status === 400 && data?.fieldErrors) {
+    throw new ValidationError(data.fieldErrors);
   }
   if (!response.ok) {
-    throw new Error("Falha na requisição");
+    throw new ApiError(response.status, data?.error ?? "Falha na requisição");
   }
-  return response.json() as Promise<T>;
+  return data as T;
 }
 
-export function setDisplayOff(clientId: string, displayOff: boolean) {
-  return send<Client>(`/api/clients/${clientId}/display`, "PUT", {
-    displayOff,
-  });
-}
+// --- leitura ---
+export const fetchExperiences = () => request<Experience[]>("/api/experiences");
+export const fetchImages = () => request<Image[]>("/api/images");
+export const fetchSettings = () => request<Settings>("/api/settings");
+/** Telas + Modo foco (usado na carga e na atualização periódica). */
+export const fetchState = () => request<FocusResponse>("/api/focus");
 
-export function assignExperience(clientId: string, experienceId: string) {
-  return send<Client>(`/api/clients/${clientId}/assignment`, "PUT", {
-    experienceId,
-  });
-}
+// --- telas ---
+export const setContent = (clientId: string, update: ContentUpdate) =>
+  request<Client>(`/api/clients/${clientId}/content`, "PUT", update);
 
-export function createExperience(input: ExperienceInput) {
-  return send<Experience>("/api/experiences", "POST", input);
-}
+export const moveClient = (clientId: string, x: number, y: number) =>
+  request<Client>(`/api/clients/${clientId}/position`, "PUT", { x, y });
 
-export type FocusResponse = { focus: FocusState | null; clients: Client[] };
+export const lockClient = (clientId: string, locked: boolean) =>
+  request<Client>(`/api/clients/${clientId}/lock`, "PUT", { locked });
 
-export function startFocus(clientId: string) {
-  return send<FocusResponse>("/api/focus", "POST", { clientId });
-}
+// --- Modo foco ---
+export const startFocus = (clientId: string) =>
+  request<FocusResponse>("/api/focus", "POST", { clientId });
 
-export function endFocus() {
-  return send<FocusResponse>("/api/focus", "DELETE", undefined);
-}
+export const endFocus = () => request<FocusResponse>("/api/focus", "DELETE");
 
-export function moveClient(clientId: string, x: number, y: number) {
-  return send<Client>(`/api/clients/${clientId}/position`, "PUT", { x, y });
-}
-
-// Estado completo (telas + modo foco), usado na atualização periódica da planta.
-export async function fetchState(): Promise<FocusResponse> {
-  const response = await fetch("/api/focus", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha na requisição");
-  return response.json() as Promise<FocusResponse>;
-}
-
-export function lockClient(clientId: string, locked: boolean) {
-  return send<Client>(`/api/clients/${clientId}/lock`, "PUT", { locked });
-}
+// --- catálogo ---
+export const createExperience = (input: ExperienceInput) =>
+  request<Experience>("/api/experiences", "POST", input);

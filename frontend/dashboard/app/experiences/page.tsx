@@ -1,11 +1,11 @@
 import Link from "next/link";
 import ExperienceCard from "@/components/ExperienceCard";
-import { listExperiences } from "@/lib/store";
+import { fetchExperiences } from "@/services/api";
 
 export const dynamic = "force-dynamic";
 
-export default function ExperiencesPage() {
-  const experiences = listExperiences();
+export default async function ExperiencesPage() {
+  const experiences = await fetchExperiences();
 
   return (
     <section>

@@ -3,10 +3,8 @@
 import { useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { useBoard } from "@/hooks/useBoard";
-import { clientStatus } from "@/lib/status";
-import type { Client } from "@/types/client";
-import type { Experience } from "@/types/experience";
-import type { FocusState } from "@/types/focus";
+import { contentLabel } from "@/lib/content";
+import type { Client, Experience, FocusState, Image } from "@/types/api";
 import FocusBanner from "./FocusBanner";
 import FocusModal from "./FocusModal";
 import LockModal from "./LockModal";
@@ -39,12 +37,14 @@ type FloorPlanProps = {
   initialClients: Client[];
   initialFocus: FocusState | null;
   experiences: Experience[];
+  images: Image[];
 };
 
 export default function FloorPlan({
   initialClients,
   initialFocus,
   experiences,
+  images,
 }: FloorPlanProps) {
   const board = useBoard(initialClients, initialFocus, POLL_MS);
   const { clients, focus } = board;
@@ -221,9 +221,6 @@ export default function FloorPlan({
           const position = positionOf(client);
           const draggable = editMode && !client.locked;
           const dragging = drag?.id === client.id;
-          const current = experiences.find(
-            (e) => e.id === client.currentExperienceId,
-          );
 
           return (
             <div
@@ -250,11 +247,17 @@ export default function FloorPlan({
                   draggable ? "cursor-grab touch-none select-none" : ""
                 }`}
               >
-                <StatusBadge status={clientStatus(client)} size="sm" />
+                <StatusBadge status={client.status} size="sm" />
                 <span className={nameText}>{client.name}</span>
                 <span className={`${detailText} text-foreground/70`}>
-                  {current ? current.title : "Sem experiência"}
+                  {contentLabel(client, { experiences, images })}
                 </span>
+                {client.orientationMismatch && (
+                  <span className={`${detailText} text-orange-400`}>
+                    <span aria-hidden="true">⚠ </span>
+                    Orientação incorreta
+                  </span>
+                )}
                 {focus?.clientId === client.id && (
                   <span className={`${detailText} text-yellow-300`}>
                     <span aria-hidden="true">◉ </span>
@@ -291,14 +294,14 @@ export default function FloorPlan({
           key={`screen-${selected.id}`}
           client={selected}
           experiences={experiences}
+          images={images}
           busy={board.busyId === selected.id}
           focusActive={focus !== null || board.focusBusy}
           onClose={() => setSelectedId(null)}
-          onAssign={(experienceId) => {
-            board.assign(selected.id, experienceId);
+          onUpdate={(update) => {
+            board.updateContent(selected.id, update);
             setSelectedId(null);
           }}
-          onToggleDisplay={() => board.toggleDisplay(selected)}
           onFocus={() => setFocusTargetId(selected.id)}
         />
       )}

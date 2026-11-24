@@ -1,4 +1,4 @@
-import type { Experience } from "@/types/experience";
+import type { Experience } from "@/types/api";
 
 export type ExperienceInput = {
   title: string;
@@ -10,7 +10,7 @@ export type ExperienceInput = {
 
 export type FieldErrors = Partial<Record<keyof ExperienceInput, string>>;
 
-const types = ["web", "image"];
+const types = ["web"]; // imagens têm catálogo próprio
 const orientations = ["landscape", "portrait", "any"];
 
 function isValidUrl(value: string): boolean {

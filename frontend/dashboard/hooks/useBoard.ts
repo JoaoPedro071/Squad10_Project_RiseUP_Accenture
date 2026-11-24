@@ -1,17 +1,32 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Client } from "@/types/client";
-import type { FocusState } from "@/types/focus";
 import {
-  assignExperience,
+  ApiError,
   endFocus,
   fetchState,
   lockClient,
   moveClient,
-  setDisplayOff,
+  setContent,
   startFocus,
 } from "@/services/api";
+import type { Client, ContentUpdate, FocusState } from "@/types/api";
+
+function errorMessage(error: unknown, fallback: string) {
+  // O backend já responde em português (ex.: "A tela está offline").
+  return error instanceof ApiError ? error.message : fallback;
+}
+
+// Nunca diz "Concluído" se a tela ainda não vai exibir a mudança.
+function savedMessage(client: Client) {
+  if (client.status === "off") {
+    return `Salvo. ${client.name} exibirá o conteúdo quando voltar a se conectar.`;
+  }
+  if (client.status === "paused") {
+    return `Salvo. ${client.name} exibirá o conteúdo ao sair do Modo foco.`;
+  }
+  return "Concluído. A tela atualiza em instantes.";
+}
 
 // Estado e ações compartilhados entre /clients e a planta (/).
 // pollMs (opcional): atualiza as telas do servidor a cada N ms.
@@ -72,33 +87,17 @@ export function useBoard(
     );
   }
 
-  async function toggleDisplay(client: Client) {
-    setBusyId(client.id);
-    setMessage("Atualizando...");
-    try {
-      const updated = await track(() =>
-        setDisplayOff(client.id, !client.displayOff),
-      );
-      replaceClient(updated);
-      setMessage("Concluído. A tela atualiza em instantes.");
-    } catch {
-      setMessage("Não foi possível concluir a ação. Tente novamente.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function assign(clientId: string, experienceId: string) {
+  async function updateContent(clientId: string, update: ContentUpdate) {
     setBusyId(clientId);
     setMessage("Atualizando...");
     try {
-      const updated = await track(() =>
-        assignExperience(clientId, experienceId),
-      );
+      const updated = await track(() => setContent(clientId, update));
       replaceClient(updated);
-      setMessage("Concluído. A tela atualiza em instantes.");
-    } catch {
-      setMessage("Não foi possível trocar a experiência. Tente novamente.");
+      setMessage(savedMessage(updated));
+    } catch (error) {
+      setMessage(
+        errorMessage(error, "Não foi possível trocar o conteúdo. Tente novamente."),
+      );
     } finally {
       setBusyId(null);
     }
@@ -115,9 +114,11 @@ export function useBoard(
       const updated = await track(() => moveClient(clientId, x, y));
       replaceClient(updated);
       setMessage("Concluído. Posição salva.");
-    } catch {
+    } catch (error) {
       if (previous) replaceClient(previous);
-      setMessage("Não foi possível salvar a posição. Tente novamente.");
+      setMessage(
+        errorMessage(error, "Não foi possível salvar a posição. Tente novamente."),
+      );
     }
   }
 
@@ -132,8 +133,10 @@ export function useBoard(
           ? "Concluído. Posição travada."
           : "Concluído. Posição destravada.",
       );
-    } catch {
-      setMessage("Não foi possível alterar o travamento. Tente novamente.");
+    } catch (error) {
+      setMessage(
+        errorMessage(error, "Não foi possível alterar o travamento. Tente novamente."),
+      );
     } finally {
       setBusyId(null);
     }
@@ -146,14 +149,11 @@ export function useBoard(
       const result = await track(() => startFocus(clientId));
       setClients(result.clients);
       setFocus(result.focus);
-      const offline = result.focus?.offlineIds.length ?? 0;
+      setMessage("Concluído. Modo foco ativo: as outras telas estão em pausa.");
+    } catch (error) {
       setMessage(
-        offline > 0
-          ? `Modo foco ativo, parcial: ${offline} tela(s) offline não foram apagadas.`
-          : "Concluído. Modo foco ativo.",
+        errorMessage(error, "Não foi possível ativar o Modo foco. Tente novamente."),
       );
-    } catch {
-      setMessage("Não foi possível ativar o modo foco. Tente novamente.");
     } finally {
       setFocusBusy(false);
     }
@@ -166,9 +166,11 @@ export function useBoard(
       const result = await track(() => endFocus());
       setClients(result.clients);
       setFocus(result.focus);
-      setMessage("Concluído. As telas foram restauradas.");
-    } catch {
-      setMessage("Não foi possível sair do modo foco. Tente novamente.");
+      setMessage("Concluído. Cada tela voltou ao seu conteúdo.");
+    } catch (error) {
+      setMessage(
+        errorMessage(error, "Não foi possível sair do Modo foco. Tente novamente."),
+      );
     } finally {
       setFocusBusy(false);
     }
@@ -180,8 +182,7 @@ export function useBoard(
     busyId,
     focusBusy,
     message,
-    toggleDisplay,
-    assign,
+    updateContent,
     move,
     lock,
     notify: setMessage,

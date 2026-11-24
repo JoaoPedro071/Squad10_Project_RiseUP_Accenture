@@ -1,44 +1,56 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { isIncompatible, orientationLabel } from "@/lib/orientation";
-import { clientStatus } from "@/lib/status";
-import type { Client } from "@/types/client";
-import type { Experience } from "@/types/experience";
+import { CLIENT_APP_URL } from "@/lib/config";
+import { contentLabel, pendingNote } from "@/lib/content";
+import {
+  isIncompatible,
+  orientationLabel,
+  screenOrientationText,
+} from "@/lib/orientation";
+import type {
+  Client,
+  ContentOrientation,
+  ContentUpdate,
+  Experience,
+  Image,
+} from "@/types/api";
 import StatusBadge from "./StatusBadge";
-
-const clientAppUrl =
-  process.env.NEXT_PUBLIC_CLIENT_APP_URL ?? "http://localhost:3001";
 
 const secondaryButton =
   "min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 const primaryButton =
   "min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
+const optionButton =
+  "flex min-h-11 w-full flex-col items-start rounded-md border p-3 text-left text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
+
+type Item = { id: string; title: string; orientation: ContentOrientation };
+type Pending = { item: Item; update: ContentUpdate };
 
 type ScreenModalProps = {
   client: Client;
   experiences: Experience[];
+  images: Image[];
   busy: boolean;
   focusActive: boolean;
   onClose: () => void;
-  onAssign: (experienceId: string) => void;
-  onToggleDisplay: () => void;
+  onUpdate: (update: ContentUpdate) => void;
   onFocus: () => void;
 };
 
 export default function ScreenModal({
   client,
   experiences,
+  images,
   busy,
   focusActive,
   onClose,
-  onAssign,
-  onToggleDisplay,
+  onUpdate,
   onFocus,
 }: ScreenModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  // Experiência incompatível aguardando confirmação.
-  const [pending, setPending] = useState<Experience | null>(null);
+  // Conteúdo com orientação diferente da tela, aguardando confirmação.
+  const [pending, setPending] = useState<Pending | null>(null);
 
   // Abre o <dialog> assim que o componente aparece.
   useEffect(() => {
@@ -48,24 +60,58 @@ export default function ScreenModal({
     }
   }, []);
 
-  const offline = client.status === "offline";
-  const disabled = busy || offline;
-  const active = experiences.filter((e) => e.active);
-  const current = experiences.find((e) => e.id === client.currentExperienceId);
+  const currentExperience = experiences.find(
+    (e) => e.id === client.currentExperienceId,
+  );
+  const currentImage = images.find((i) => i.id === client.imgId);
+  const note = pendingNote(client);
 
-  function choose(experience: Experience) {
-    if (isIncompatible(client, experience)) {
-      setPending(experience);
+  function choose(item: Item, update: ContentUpdate) {
+    if (isIncompatible(client, item)) {
+      setPending({ item, update });
       return;
     }
     setPending(null);
-    onAssign(experience.id);
+    onUpdate(update);
   }
 
-  function applyPending() {
-    if (!pending) return;
-    onAssign(pending.id);
-    setPending(null);
+  function renderOptions(
+    items: Item[],
+    currentId: string | null,
+    toUpdate: (id: string) => ContentUpdate,
+  ) {
+    return (
+      <ul className="mt-2 flex flex-col gap-2">
+        {items.map((item) => {
+          const isCurrent = item.id === currentId;
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                onClick={() => choose(item, toUpdate(item.id))}
+                disabled={busy}
+                aria-current={isCurrent ? "true" : undefined}
+                className={`${optionButton} ${isCurrent ? "border-accent" : "border-border"}`}
+              >
+                <span className="font-medium">
+                  {item.title}
+                  {isCurrent && " (atribuída)"}
+                </span>
+                <span className="text-xs text-foreground/70">
+                  {orientationLabel[item.orientation]}
+                  {isIncompatible(client, item) && (
+                    <span className="ml-2 text-yellow-300">
+                      <span aria-hidden="true">⚠ </span>
+                      Orientação diferente da tela
+                    </span>
+                  )}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
   }
 
   return (
@@ -79,38 +125,43 @@ export default function ScreenModal({
         <h2 id="screen-title" className="text-lg font-semibold">
           {client.name}
         </h2>
-        <StatusBadge status={clientStatus(client)} />
+        <StatusBadge status={client.status} />
       </div>
       <p className="mt-2 text-sm text-foreground/80">
-        {current ? current.title : "Sem experiência configurada"}
+        Exibindo: {contentLabel(client, { experiences, images })}
       </p>
       <p className="mt-1 text-xs text-foreground/60">
-        {orientationLabel[client.orientation]}
+        {screenOrientationText(client)}
+        {client.orientationMismatch && (
+          <span className="ml-2 text-orange-400">
+            <span aria-hidden="true">⚠ </span>
+            Não combina com o conteúdo exibido
+          </span>
+        )}
       </p>
+      {note && <p className="mt-2 text-xs text-yellow-300">{note}</p>}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onToggleDisplay}
-          disabled={disabled}
-          className={secondaryButton}
-        >
-          {busy
-            ? "Atualizando..."
-            : client.displayOff
-              ? "Ligar tela"
-              : "Desligar tela"}
-        </button>
+        {currentExperience && currentImage && (
+          <button
+            type="button"
+            onClick={() => onUpdate({ displayImg: !client.displayImg })}
+            disabled={busy}
+            className={secondaryButton}
+          >
+            {client.displayImg ? "Exibir a experiência" : "Exibir a imagem"}
+          </button>
+        )}
         <button
           type="button"
           onClick={onFocus}
-          disabled={disabled || client.displayOff || focusActive}
+          disabled={busy || client.status === "off" || focusActive}
           className={secondaryButton}
         >
           Modo foco
         </button>
         <a
-          href={`${clientAppUrl}/?client=${client.id}`}
+          href={`${CLIENT_APP_URL}/?client=${client.id}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex min-h-11 items-center rounded-md px-3 text-sm text-purple-300 underline hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
@@ -119,40 +170,39 @@ export default function ScreenModal({
         </a>
       </div>
 
-      <h3 className="mt-5 text-sm font-semibold">Trocar experiência</h3>
-      <ul className="mt-2 flex flex-col gap-2">
-        {active.map((experience) => {
-          const isCurrent = experience.id === client.currentExperienceId;
-          const incompatible = isIncompatible(client, experience);
-          return (
-            <li key={experience.id}>
-              <button
-                type="button"
-                onClick={() => choose(experience)}
-                disabled={disabled}
-                aria-current={isCurrent ? "true" : undefined}
-                className={`flex min-h-11 w-full flex-col items-start rounded-md border p-3 text-left text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${
-                  isCurrent ? "border-accent" : "border-border"
-                }`}
-              >
-                <span className="font-medium">
-                  {experience.title}
-                  {isCurrent && " (atual)"}
-                </span>
-                <span className="text-xs text-foreground/70">
-                  {orientationLabel[experience.orientation]}
-                  {incompatible && (
-                    <span className="ml-2 text-yellow-300">
-                      <span aria-hidden="true">⚠ </span>
-                      Orientação diferente
-                    </span>
-                  )}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <h3 className="mt-5 text-sm font-semibold">Experiência</h3>
+      {renderOptions(
+        experiences.filter((e) => e.active),
+        client.currentExperienceId,
+        (id) => ({ experienceId: id }),
+      )}
+      {currentExperience && (
+        <button
+          type="button"
+          onClick={() => onUpdate({ experienceId: null })}
+          disabled={busy}
+          className={`${secondaryButton} mt-2`}
+        >
+          Remover experiência
+        </button>
+      )}
+
+      <h3 className="mt-5 text-sm font-semibold">Imagem</h3>
+      {renderOptions(
+        images.filter((i) => i.active),
+        client.imgId,
+        (id) => ({ imgId: id }),
+      )}
+      {currentImage && (
+        <button
+          type="button"
+          onClick={() => onUpdate({ imgId: null })}
+          disabled={busy}
+          className={`${secondaryButton} mt-2`}
+        >
+          Remover imagem
+        </button>
+      )}
 
       {pending && (
         <div
@@ -161,15 +211,21 @@ export default function ScreenModal({
         >
           <p>
             <span aria-hidden="true">⚠ </span>
-            {pending.title} é em{" "}
-            {orientationLabel[pending.orientation].toLowerCase()} e a tela está
-            em {orientationLabel[client.orientation].toLowerCase()}. O conteúdo
-            pode aparecer cortado ou com bordas.
+            {pending.item.title} é em{" "}
+            {orientationLabel[pending.item.orientation].toLowerCase()} e a tela
+            está em{" "}
+            {client.reportedOrientation
+              ? orientationLabel[client.reportedOrientation].toLowerCase()
+              : "outra orientação"}
+            . O conteúdo pode aparecer cortado ou com bordas.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={applyPending}
+              onClick={() => {
+                onUpdate(pending.update);
+                setPending(null);
+              }}
               className={primaryButton}
             >
               Aplicar assim mesmo

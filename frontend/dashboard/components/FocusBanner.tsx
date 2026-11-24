@@ -1,5 +1,4 @@
-import type { Client } from "@/types/client";
-import type { FocusState } from "@/types/focus";
+import type { Client, FocusState } from "@/types/api";
 
 type FocusBannerProps = {
   focus: FocusState;
@@ -14,8 +13,7 @@ export default function FocusBanner({
   busy,
   onExit,
 }: FocusBannerProps) {
-  const nameOf = (id: string) => clients.find((c) => c.id === id)?.name ?? id;
-  const list = (ids: string[]) => ids.map(nameOf).join(", ");
+  const name = clients.find((c) => c.id === focus.clientId)?.name ?? focus.clientId;
 
   return (
     <div
@@ -28,16 +26,8 @@ export default function FocusBanner({
           Modo foco ativo
         </p>
         <p className="mt-1 text-sm text-foreground/80">
-          Apresentando em {nameOf(focus.clientId)}. Telas apagadas:{" "}
-          {focus.affectedIds.length > 0 ? list(focus.affectedIds) : "nenhuma"}.
+          Apresentando em {name}. As demais telas estão em pausa.
         </p>
-        {focus.offlineIds.length > 0 && (
-          <p className="mt-1 text-sm text-yellow-300">
-            <span aria-hidden="true">⚠ </span>
-            Parcial: não foi possível apagar (offline): {list(focus.offlineIds)}
-            .
-          </p>
-        )}
       </div>
       <button
         type="button"
@@ -45,7 +35,7 @@ export default function FocusBanner({
         disabled={busy}
         className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {busy ? "Atualizando..." : "Sair do modo foco"}
+        {busy ? "Atualizando..." : "Sair do Modo foco"}
       </button>
     </div>
   );
