@@ -1,5 +1,9 @@
 """Dados iniciais (catalogo de experiencias, imagens e telas)."""
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from db.tables import ClientRow, ExperienceRow, ImageRow, SettingsRow
 from schemas.client import Client
 from schemas.experience import Experience
 from schemas.image import Image
@@ -57,3 +61,36 @@ def seed_clients() -> list[Client]:
         Client(id="cli-4", name="Monitor Touch Central",
                x=75, y=72),
     ]
+
+
+def seed_database(session: Session) -> bool:
+    """Grava os dados iniciais, mas so se o banco estiver vazio.
+
+    Devolve True se gravou. Assim, reiniciar a API nao apaga nada.
+    """
+    if session.scalar(select(ClientRow.pk).limit(1)) is not None:
+        return False
+
+    for experience in seed_experiences():
+        session.add(ExperienceRow(**experience.model_dump()))
+    for image in seed_images():
+        session.add(ImageRow(**image.model_dump()))
+    # Grava o catalogo antes das telas, que apontam para ele.
+    session.flush()
+
+    for client in seed_clients():
+        session.add(
+            ClientRow(
+                id=client.id,
+                name=client.name,
+                current_experience_id=client.current_experience_id,
+                img_id=client.img_id,
+                display_img=client.display_img,
+                x=client.x,
+                y=client.y,
+                locked=client.locked,
+            )
+        )
+    session.add(SettingsRow(id=1))  # stand-by comeca sem imagem (tela preta)
+    session.commit()
+    return True

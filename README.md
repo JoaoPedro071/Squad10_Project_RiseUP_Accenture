@@ -37,7 +37,7 @@ Instale o [uv](https://docs.astral.sh/uv/) uma vez; ele cuida do Python (3.12) e
 cd backend
 uv sync
 uv run uvicorn main:app --reload --port 8000
-uv run pytest                    # 70 testes
+uv run pytest                    # 75 testes
 ```
 
 Documentação interativa da API: http://localhost:8000/docs
@@ -86,7 +86,7 @@ Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
 - [x] Back-end: novo modelo de tela, catálogo de imagens, stand-by global e atribuição de conteúdo
 - [x] Back-end: sinal de vida, 5 estados, aviso de orientação, Modo foco como camada e CORS restrito (70 testes)
 - [x] Integração entre front-end e back-end (dashboard e player usam a API; páginas de Imagens e Configurações)
-- [ ] Persistência em banco de dados
+- [x] Persistência em banco de dados (SQLite; Postgres no deploy)
 - [ ] Tempo real com WebSocket
 - [ ] Deploy na AWS com custo zero
 - [ ] Assistente de IA com confirmação do usuário

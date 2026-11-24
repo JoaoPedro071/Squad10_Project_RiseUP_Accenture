@@ -1,6 +1,6 @@
 # Backend: Experience Manager API (FastAPI)
 
-API que guarda o estado das telas e do catálogo, valida cada ação e informa a cada tela (player) o que exibir. Estado em memória (reinicia ao subir) e um único worker.
+API que guarda o estado das telas e do catálogo, valida cada ação e informa a cada tela (player) o que exibir. Os dados ficam em um banco (SQLite por padrão) e o sinal de vida fica em memória. Rode com um único worker.
 
 ## Rodar
 
@@ -27,8 +27,17 @@ Copie `env.example` para `.env` (o `.env` nunca deve ser commitado).
 | `APP_ENV` | `development` | `production` ativa as checagens de produção |
 | `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3001` | Sites (dashboard e player) que podem chamar a API. `*` libera tudo e é **recusado** em `production` |
 | `HEARTBEAT_TIMEOUT_SECONDS` | `15` | Segundos sem sinal de vida até a tela ficar *Desligada* |
+| `DATABASE_URL` | `sqlite:///./experience-manager.db` | Banco de dados. Para Postgres, basta trocar a URL |
 
 Se o front for aberto por outro endereço (IP da máquina, outra porta), acrescente-o em `CORS_ORIGINS`.
+
+### Banco de dados
+
+- Na primeira vez que a API sobe, ela cria o arquivo `experience-manager.db` (fora do Git) e grava os dados iniciais. Nas próximas vezes, mantém o que já existe.
+- **No banco:** experiências, imagens, telas (posição, trava e conteúdo), stand-by e Modo foco.
+- **Em memória:** o sinal de vida. Ao reiniciar a API, as telas aparecem *Desligadas* até o próximo aviso (em até 5 s) e voltam ao mesmo conteúdo.
+- **Voltar aos dados iniciais:** pare a API, apague `experience-manager.db` e suba de novo.
+- Os testes usam um banco em memória e não mexem nesse arquivo.
 
 ## Conceitos
 
@@ -185,11 +194,12 @@ Rótulos sugeridos para a interface: `busy` Em uso · `standby` Stand-by · `pau
 pyproject.toml     dependências (uv) e configuração do pytest
 uv.lock            versões exatas das dependências (gerado pelo uv)
 main.py            app, CORS e routers
-config.py          variáveis de ambiente (APP_ENV, CORS_ORIGINS, HEARTBEAT_TIMEOUT_SECONDS)
+config.py          variáveis de ambiente (APP_ENV, CORS_ORIGINS, HEARTBEAT_TIMEOUT_SECONDS, DATABASE_URL)
 errors.py          formatos de erro que o front espera
 routers/           experiences.py, images.py, settings.py, clients.py (telas), focus.py
 schemas/           formatos dos dados (Pydantic, JSON em camelCase)
-models/            store em memória + seed (vira banco de dados depois)
+db/                conexão e tabelas do banco (SQLAlchemy)
+models/            store (banco + sinal de vida em memória) e seed
 services/          validation.py (e ai_service.py no futuro)
 tests/             pytest
 ```
@@ -198,7 +208,7 @@ Observação: o documento de arquitetura previa `monitors.py` e `assignments.py`
 
 ## Próximos passos
 
-1. Persistência (SQLite no dev, Postgres no deploy), mantendo a interface de `models/store.py`.
+1. Postgres no deploy (trocar `DATABASE_URL`) e migrações com Alembic.
 2. Pareamento das telas por código e modo de identificação.
 3. WebSocket no lugar do polling do player.
 4. IA: `POST /api/ai/command`, sempre com prévia e confirmação do usuário.

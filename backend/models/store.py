@@ -1,21 +1,25 @@
-"""Armazenamento em memoria (fatia 1).
+"""Armazenamento da API: banco de dados (SQLAlchemy) + sinal de vida em memoria.
 
-Equivale a dashboard/lib/store.ts. Na fatia 2 este modulo vira a camada de
-persistencia (SQLAlchemy) mantendo a mesma interface publica, entao os routers
-nao precisam mudar. Como o estado vive no processo, rode com UM worker.
+Os routers usam so as funcoes publicas daqui; elas mantem os mesmos nomes
+e formatos da versao em memoria.
+
+O que fica no banco: experiencias, imagens, telas (posicao, trava, conteudo),
+configuracoes e Modo foco. O que fica em memoria: o sinal de vida (ultimo
+aviso, orientacao e resolucao). Ao reiniciar a API, as telas aparecem
+desligadas ate o proximo aviso (em ate 5 s). Rode com UM worker.
 """
 
-import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from config import HEARTBEAT_TIMEOUT_SECONDS
-from models.seed import (
-    ONLINE_AT_START,
-    seed_clients,
-    seed_experiences,
-    seed_images,
-)
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from config import DATABASE_URL, HEARTBEAT_TIMEOUT_SECONDS
+from db.database import Base, create_tables, make_engine
+from db.tables import ClientRow, ExperienceRow, FocusRow, ImageRow, SettingsRow
+from models.seed import ONLINE_AT_START, seed_clients, seed_database
 from schemas.client import Client
 from schemas.display import (
     DisplayExperience,
@@ -29,48 +33,115 @@ from schemas.focus import FocusState
 from schemas.image import Image
 from schemas.settings import Settings
 
+FOCUS_ROW_ID = 1
+SETTINGS_ROW_ID = 1
 
-class InMemoryStore:
-    def __init__(self) -> None:
-        self.reset()
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+@dataclass
+class Signal:
+    """Ultimo sinal de vida de uma tela (so em memoria)."""
+
+    last_seen_at: datetime
+    orientation: str
+    resolution: str | None
+
+
+class Store:
+    def __init__(self, url: str = DATABASE_URL) -> None:
+        # Relogio substituivel nos testes (para simular o tempo passando).
+        self._clock = _now
+        self._signals: dict[str, Signal] = {}
+        self._engine = make_engine(url)
+        create_tables(self._engine)
+        with self._session() as s:
+            seed_database(s)
 
     def reset(self) -> None:
-        # Relogio substituivel nos testes (para simular o tempo passando).
-        self._clock = lambda: datetime.now(timezone.utc)
-        self._experiences = seed_experiences()
-        self._images = seed_images()
-        self._clients = seed_clients()
-        self._focus: FocusState | None = None
-        self._settings = Settings()
-        # As telas do seed marcadas como online "acabaram de dar sinal".
-        # Sem o player rodando, elas ficam desligadas apos o tempo limite.
-        for client in self._clients:
-            if client.id in ONLINE_AT_START:
-                client.last_seen_at = self._clock()
+        """Usado pelos testes: apaga tudo, grava o seed de novo e simula o
+        sinal de vida das telas que comecam ligadas."""
+        self._clock = _now
+        Base.metadata.drop_all(self._engine)
+        create_tables(self._engine)
+        with self._session() as s:
+            seed_database(s)
+        self._signals = {
+            c.id: Signal(self._clock(), c.reported_orientation, c.reported_resolution)
+            for c in seed_clients()
+            if c.id in ONLINE_AT_START
+        }
+
+    def close(self) -> None:
+        """Fecha as conexoes com o banco."""
+        self._engine.dispose()
+
+    # --- apoio interno ---
+    def _session(self) -> Session:
+        return Session(self._engine, expire_on_commit=False)
+
+    @staticmethod
+    def _row(s: Session, table, item_id: str | None):
+        """Busca uma linha pelo id de texto (ex.: "exp-1")."""
+        if item_id is None:
+            return None
+        return s.scalar(select(table).where(table.id == item_id))
+
+    def _focus_client_id(self, s: Session) -> str | None:
+        focus = s.get(FocusRow, FOCUS_ROW_ID)
+        return focus.client_id if focus else None
+
+    def _to_client(self, s: Session, row: ClientRow) -> Client:
+        """Junta a linha do banco com o sinal de vida e calcula o estado."""
+        signal = self._signals.get(row.id)
+        client = Client(
+            id=row.id,
+            name=row.name,
+            current_experience_id=row.current_experience_id,
+            img_id=row.img_id,
+            display_img=row.display_img,
+            x=row.x,
+            y=row.y,
+            locked=row.locked,
+            reported_orientation=signal.orientation if signal else None,
+            reported_resolution=signal.resolution if signal else None,
+            last_seen_at=signal.last_seen_at if signal else None,
+        )
+        self._refresh_status(s, client)
+        return client
 
     # --- leitura ---
     def list_experiences(self) -> list[Experience]:
-        return list(self._experiences)
+        with self._session() as s:
+            rows = s.scalars(select(ExperienceRow).order_by(ExperienceRow.pk))
+            return [Experience.model_validate(r, from_attributes=True) for r in rows]
 
     def list_images(self) -> list[Image]:
-        return list(self._images)
+        with self._session() as s:
+            rows = s.scalars(select(ImageRow).order_by(ImageRow.pk))
+            return [Image.model_validate(r, from_attributes=True) for r in rows]
 
     def list_clients(self) -> list[Client]:
-        for client in self._clients:
-            self._refresh_status(client)
-        return list(self._clients)
+        with self._session() as s:
+            rows = s.scalars(select(ClientRow).order_by(ClientRow.pk)).all()
+            return [self._to_client(s, r) for r in rows]
 
     def find_experience(self, experience_id: str) -> Experience | None:
-        return next((e for e in self._experiences if e.id == experience_id), None)
+        with self._session() as s:
+            row = self._row(s, ExperienceRow, experience_id)
+            return Experience.model_validate(row, from_attributes=True) if row else None
 
     def find_image(self, image_id: str) -> Image | None:
-        return next((i for i in self._images if i.id == image_id), None)
+        with self._session() as s:
+            row = self._row(s, ImageRow, image_id)
+            return Image.model_validate(row, from_attributes=True) if row else None
 
     def find_client(self, client_id: str) -> Client | None:
-        client = next((c for c in self._clients if c.id == client_id), None)
-        if client is not None:
-            self._refresh_status(client)
-        return client
+        with self._session() as s:
+            row = self._row(s, ClientRow, client_id)
+            return self._to_client(s, row) if row else None
 
     # --- sinal de vida ---
     def is_alive(self, client: Client) -> bool:
@@ -79,29 +150,30 @@ class InMemoryStore:
         seen = client.last_seen_at
         return seen is not None and self._clock() - seen <= limit
 
-    def _shown_orientation(self, client: Client) -> str | None:
+    def _shown_orientation(self, s: Session, client: Client) -> str | None:
         """Orientacao do conteudo que a tela exibe agora (None = nada exibido)."""
         if client.display_img and client.img_id:
-            image = self.find_image(client.img_id)
+            image = self._row(s, ImageRow, client.img_id)
             return image.orientation if image else None
         if client.current_experience_id:
-            experience = self.find_experience(client.current_experience_id)
+            experience = self._row(s, ExperienceRow, client.current_experience_id)
             return experience.orientation if experience else None
         return None
 
-    def _refresh_status(self, client: Client) -> None:
+    def _refresh_status(self, s: Session, client: Client) -> None:
         """Calcula o estado da tela. Prioridade:
         Desligada > Em pausa > Erro > Em uso > Stand-by."""
-        content = self._shown_orientation(client)
+        content = self._shown_orientation(s, client)
         client.orientation_mismatch = (
             content is not None
             and content != "any"
             and client.reported_orientation is not None
             and content != client.reported_orientation
         )
+        focus_id = self._focus_client_id(s)
         if not self.is_alive(client):
             client.status = "off"
-        elif self.is_paused(client):
+        elif focus_id is not None and client.id != focus_id:
             client.status = "paused"
         elif client.orientation_mismatch:
             client.status = "error"
@@ -115,15 +187,15 @@ class InMemoryStore:
     ) -> Client | None:
         """A tela avisou que esta viva. Atualiza o que ela informou.
         A atribuicao de conteudo nao muda: ao voltar, a tela exibe o mesmo."""
-        client = next((c for c in self._clients if c.id == client_id), None)
-        if client is None:
-            return None
-        client.last_seen_at = self._clock()
-        client.reported_orientation = orientation
-        if resolution is not None:
-            client.reported_resolution = resolution
-        self._refresh_status(client)
-        return client
+        with self._session() as s:
+            row = self._row(s, ClientRow, client_id)
+            if row is None:
+                return None
+            previous = self._signals.get(client_id)
+            if resolution is None and previous is not None:
+                resolution = previous.resolution
+            self._signals[client_id] = Signal(self._clock(), orientation, resolution)
+            return self._to_client(s, row)
 
     # --- escrita ---
     def update_client(
@@ -134,16 +206,18 @@ class InMemoryStore:
         y: float | None = None,
         locked: bool | None = None,
     ) -> Client | None:
-        client = self.find_client(client_id)
-        if client is None:
-            return None
-        if x is not None:
-            client.x = x
-        if y is not None:
-            client.y = y
-        if locked is not None:
-            client.locked = locked
-        return client
+        with self._session() as s:
+            row = self._row(s, ClientRow, client_id)
+            if row is None:
+                return None
+            if x is not None:
+                row.x = x
+            if y is not None:
+                row.y = y
+            if locked is not None:
+                row.locked = locked
+            s.commit()
+            return self._to_client(s, row)
 
     def set_content(
         self,
@@ -154,21 +228,23 @@ class InMemoryStore:
         display_img: bool,
     ) -> Client | None:
         """Grava o conteudo da tela. Diferente de update_client, aqui None
-        significa "remover", entao da para deixar a tela sem conteudo."""
-        client = self.find_client(client_id)
-        if client is None:
-            return None
-        client.current_experience_id = current_experience_id
-        client.img_id = img_id
-        client.display_img = display_img
-        # Durante o Modo foco a tela segue Em pausa: a troca fica guardada
-        # e aparece quando o foco terminar.
-        self._refresh_status(client)
-        return client
+        significa "remover", entao da para deixar a tela sem conteudo.
+        Durante o Modo foco a tela segue Em pausa: a troca fica guardada
+        e aparece quando o foco terminar."""
+        with self._session() as s:
+            row = self._row(s, ClientRow, client_id)
+            if row is None:
+                return None
+            row.current_experience_id = current_experience_id
+            row.img_id = img_id
+            row.display_img = display_img
+            s.commit()
+            return self._to_client(s, row)
 
     def create_experience(self, data: dict) -> Experience:
-        experience = Experience(
-            id=f"exp-{int(time.time() * 1000)}",
+        row = ExperienceRow(
+            # uuid evita ids repetidos quando duas experiencias sao criadas juntas.
+            id=f"exp-{uuid.uuid4().hex[:8]}",
             title=str(data["title"]).strip(),
             description=str(data.get("description") or "").strip(),
             url=str(data["url"]).strip(),
@@ -176,12 +252,13 @@ class InMemoryStore:
             orientation=data["orientation"],
             active=True,
         )
-        self._experiences.append(experience)
-        return experience
+        with self._session() as s:
+            s.add(row)
+            s.commit()
+            return Experience.model_validate(row, from_attributes=True)
 
     def create_image(self, data: dict) -> Image:
-        image = Image(
-            # uuid evita ids repetidos quando duas imagens sao criadas no mesmo instante.
+        row = ImageRow(
             id=f"img-{uuid.uuid4().hex[:8]}",
             title=str(data["title"]).strip(),
             description=str(data.get("description") or "").strip(),
@@ -189,53 +266,72 @@ class InMemoryStore:
             orientation=data["orientation"],
             active=True,
         )
-        self._images.append(image)
-        return image
+        with self._session() as s:
+            s.add(row)
+            s.commit()
+            return Image.model_validate(row, from_attributes=True)
 
     def set_image_active(self, image_id: str, active: bool) -> Image | None:
-        image = self.find_image(image_id)
-        if image is None:
-            return None
-        image.active = active
-        return image
+        with self._session() as s:
+            row = self._row(s, ImageRow, image_id)
+            if row is None:
+                return None
+            row.active = active
+            s.commit()
+            return Image.model_validate(row, from_attributes=True)
 
     # --- configuracoes globais ---
     def get_settings(self) -> Settings:
-        return self._settings
+        with self._session() as s:
+            row = s.get(SettingsRow, SETTINGS_ROW_ID)
+            return Settings(standby_image_id=row.standby_image_id if row else None)
 
     def set_standby_image(self, image_id: str | None) -> Settings:
-        self._settings.standby_image_id = image_id
-        return self._settings
+        with self._session() as s:
+            row = s.get(SettingsRow, SETTINGS_ROW_ID)
+            if row is None:
+                row = SettingsRow(id=SETTINGS_ROW_ID)
+                s.add(row)
+            row.standby_image_id = image_id
+            s.commit()
+            return Settings(standby_image_id=row.standby_image_id)
 
     # --- Modo foco: camada por cima das atribuicoes ---
     def get_focus(self) -> FocusState | None:
-        return self._focus
+        with self._session() as s:
+            client_id = self._focus_client_id(s)
+            return FocusState(client_id=client_id) if client_id else None
 
     def is_paused(self, client: Client) -> bool:
         """Em pausa = Modo foco ativo e esta nao e a tela em foco.
         Vale tambem para quem reconecta durante o foco."""
-        return self._focus is not None and client.id != self._focus.client_id
+        focus = self.get_focus()
+        return focus is not None and client.id != focus.client_id
 
     def start_focus(self, client_id: str) -> FocusState | str:
         """Devolve o FocusState ou o codigo do erro: not_found, offline, already_active."""
-        if self._focus is not None:
-            return "already_active"
-        focused = self.find_client(client_id)
-        if focused is None:
-            return "not_found"
-        if not self.is_alive(focused):
-            return "offline"
-        # Nada e alterado nas telas: a pausa e calculada a partir do foco.
-        self._focus = FocusState(client_id=client_id)
-        return self._focus
+        with self._session() as s:
+            if self._focus_client_id(s) is not None:
+                return "already_active"
+            row = self._row(s, ClientRow, client_id)
+            if row is None:
+                return "not_found"
+            if not self.is_alive(self._to_client(s, row)):
+                return "offline"
+            # Nada e alterado nas telas: a pausa e calculada a partir do foco.
+            s.add(FocusRow(id=FOCUS_ROW_ID, client_id=client_id))
+            s.commit()
+            return FocusState(client_id=client_id)
 
     def end_focus(self) -> bool:
         """Cada tela volta exatamente ao que tem atribuido."""
-        if self._focus is None:
-            return False
-        self._focus = None
-        return True
-
+        with self._session() as s:
+            focus = s.get(FocusRow, FOCUS_ROW_ID)
+            if focus is None:
+                return False
+            s.delete(focus)
+            s.commit()
+            return True
 
     # --- o que a tela do monitor deve mostrar agora ---
     def get_display_state(self, client_id: str) -> DisplayState | None:
@@ -257,9 +353,9 @@ class InMemoryStore:
             experience = self.find_experience(client.current_experience_id)
             if experience:
                 return DisplayExperience(experience=experience)
-        standby_id = self._settings.standby_image_id
+        standby_id = self.get_settings().standby_image_id
         standby = self.find_image(standby_id) if standby_id else None
         return DisplayStandby(image=standby)
 
 
-store = InMemoryStore()
+store = Store()
