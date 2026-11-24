@@ -5,6 +5,7 @@ const links = [
   { href: "/experiences", label: "Experiências" },
   { href: "/images", label: "Imagens" },
   { href: "/clients", label: "Telas" },
+  { href: "/settings", label: "Configurações" },
 ];
 
 export default function Navbar() {

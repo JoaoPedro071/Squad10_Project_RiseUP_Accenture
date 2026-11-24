@@ -24,14 +24,17 @@ function isValidUrl(value: string): boolean {
   }
 }
 
-export function validateExperience(input: Partial<ExperienceInput>): FieldErrors {
+export function validateExperience(
+  input: Partial<ExperienceInput>,
+): FieldErrors {
   const errors: FieldErrors = {};
   const title = String(input.title ?? "").trim();
   const description = String(input.description ?? "");
   const url = String(input.url ?? "").trim();
 
   if (!title) errors.title = "Informe o título da experiência.";
-  else if (title.length > 80) errors.title = "Use no máximo 80 caracteres no título.";
+  else if (title.length > 80)
+    errors.title = "Use no máximo 80 caracteres no título.";
 
   if (description.length > 300) {
     errors.description = "Use no máximo 300 caracteres na descrição.";
@@ -51,7 +54,6 @@ export function validateExperience(input: Partial<ExperienceInput>): FieldErrors
   return errors;
 }
 
-
 // --- imagens (mesmas regras e mensagens do backend) ---
 export type ImageInput = {
   title: string;
@@ -69,7 +71,8 @@ export function validateImage(input: Partial<ImageInput>): ImageFieldErrors {
   const url = String(input.url ?? "").trim();
 
   if (!title) errors.title = "Informe o título da imagem.";
-  else if (title.length > 80) errors.title = "Use no máximo 80 caracteres no título.";
+  else if (title.length > 80)
+    errors.title = "Use no máximo 80 caracteres no título.";
 
   if (description.length > 300) {
     errors.description = "Use no máximo 300 caracteres na descrição.";

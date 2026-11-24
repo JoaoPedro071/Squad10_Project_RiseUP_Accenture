@@ -39,7 +39,8 @@ async function request<T>(
   const response = await fetch(`${API_URL}${path}`, {
     method,
     cache: "no-store",
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    headers:
+      body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (response.status === 204) return undefined as T;
@@ -81,10 +82,13 @@ export const endFocus = () => request<FocusResponse>("/api/focus", "DELETE");
 export const createExperience = (input: ExperienceInput) =>
   request<Experience>("/api/experiences", "POST", input);
 
-
 export const createImage = (input: ImageInput) =>
   request<Image>("/api/images", "POST", input);
 
 /** Inativar não apaga: só impede novas atribuições. */
 export const setImageActive = (imageId: string, active: boolean) =>
   request<Image>(`/api/images/${imageId}/active`, "PUT", { active });
+
+/** null = sem stand-by (telas sem conteúdo ficam pretas). */
+export const setStandbyImage = (standbyImageId: string | null) =>
+  request<Settings>("/api/settings", "PUT", { standbyImageId });
