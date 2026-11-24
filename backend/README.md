@@ -123,7 +123,7 @@ Carregando, falha ao carregar o conteúdo e sem conexão são estados **locais**
 
 ## Guia de integração do front
 
-O dashboard e o player ainda usam os mocks internos do Next com o contrato antigo. Ao trocar para esta API:
+O dashboard e o player já usam esta API. Referência do que mudou em relação aos mocks antigos do front:
 
 | Antes (mocks) | Agora (API) |
 |---|---|
@@ -198,8 +198,7 @@ Observação: o documento de arquitetura previa `monitors.py` e `assignments.py`
 
 ## Próximos passos
 
-1. Integração do dashboard e do player com esta API (guia acima).
-2. Persistência (SQLite no dev, Postgres no deploy), mantendo a interface de `models/store.py`.
-3. Pareamento das telas por código e modo de identificação.
-4. WebSocket no lugar do polling do player.
-5. IA: `POST /api/ai/command`, sempre com prévia e confirmação do usuário.
+1. Persistência (SQLite no dev, Postgres no deploy), mantendo a interface de `models/store.py`.
+2. Pareamento das telas por código e modo de identificação.
+3. WebSocket no lugar do polling do player.
+4. IA: `POST /api/ai/command`, sempre com prévia e confirmação do usuário.

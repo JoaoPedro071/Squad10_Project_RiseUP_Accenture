@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Player: Experience Manager
 
-## Getting Started
+Página exibida em cada tela (Next.js, porta 3001). Mostra o que o backend manda e avisa que a tela está ligada.
 
-First, run the development server:
+## Rodar
+
+Com o backend rodando (`backend/`, porta 8000):
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local      # Windows (PowerShell): Copy-Item .env.example .env.local
+npm install
+npm run dev                     # http://localhost:3001/?client=cli-1
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Variável (`.env.local`) | Padrão | Para que serve |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Endereço do backend |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Cada tela abre o player com o seu id: `http://<player>/?client=<id da tela>`. Em produção, use o navegador em tela cheia (modo quiosque) com um perfil persistente.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Como funciona
 
-## Learn More
+- A cada **1,5 s** consulta `GET /api/clients/{id}/display` e exibe: experiência, imagem, stand-by (imagem global ou preto) ou pausa (preto).
+- A cada **5 s** envia `POST /api/clients/{id}/heartbeat` com a orientação e a resolução da tela. Sem aviso por 15 s, o dashboard mostra a tela como *Desligada*.
+- Sem conexão, mantém o que está na tela e tenta de novo. Avisos próprios: "Conectando...", "Tela não identificada" (sem `?client=`) e "Tela não cadastrada" (id desconhecido).
+- Sem elementos interativos e sem cursor.
 
-To learn more about Next.js, take a look at the following resources:
+## Verificar
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npm run build
+```

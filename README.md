@@ -44,6 +44,8 @@ Documentação interativa da API: http://localhost:8000/docs
 
 ### Front-end (Node 20 ou superior)
 
+Em cada app, copie `.env.example` para `.env.local` (PowerShell: `Copy-Item .env.example .env.local`).
+
 ```bash
 cd frontend/dashboard
 npm install
@@ -53,10 +55,10 @@ npm run dev                      # http://localhost:3000
 ```bash
 cd frontend/client-app
 npm install
-npm run dev                      # http://localhost:3001
+npm run dev                      # http://localhost:3001/?client=cli-1
 ```
 
-Enquanto a integração não é concluída, o dashboard e o player usam rotas simuladas internas, com o contrato antigo. O que muda na troca está no [guia de integração](backend/README.md#guia-de-integração-do-front).
+Os dois apps usam o backend em `http://localhost:8000`; suba-o primeiro. Detalhes em [`frontend/dashboard/README.md`](frontend/dashboard/README.md) e [`frontend/client-app/README.md`](frontend/client-app/README.md).
 
 ## API em resumo
 
@@ -79,11 +81,11 @@ Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
 
 ## Status
 
-- [x] Dashboard com planta, trava de posição e Modo foco (com API simulada)
+- [x] Dashboard com planta, trava de posição e Modo foco
 - [x] Back-end, fatia 1: contrato do front e 24 testes
 - [x] Back-end: novo modelo de tela, catálogo de imagens, stand-by global e atribuição de conteúdo
 - [x] Back-end: sinal de vida, 5 estados, aviso de orientação, Modo foco como camada e CORS restrito (70 testes)
-- [ ] Integração entre front-end e back-end
+- [x] Integração entre front-end e back-end (dashboard e player usam a API; páginas de Imagens e Configurações)
 - [ ] Persistência em banco de dados
 - [ ] Tempo real com WebSocket
 - [ ] Deploy na AWS com custo zero
