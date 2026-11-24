@@ -15,9 +15,9 @@ flowchart LR
     A -.->|"planejado"| G["Gemini Flash (IA)"]
 ```
 
-- **Dashboard:** o operador vê a planta do espaço, escolhe a experiência de cada tela, liga e desliga, trava a posição e usa o Modo foco (uma tela apresenta e as outras ligadas apagam).
+- **Dashboard:** o operador vê a planta do espaço, escolhe o que cada tela exibe (experiência, imagem ou stand-by), trava a posição e usa o Modo foco (uma tela apresenta e as outras ficam em pausa).
 - **API:** guarda o estado, valida cada ação e informa ao player o que exibir.
-- **Player:** página aberta em cada tela. Hoje consulta a API periodicamente; o WebSocket é a próxima etapa.
+- **Player:** página aberta em cada tela. Envia um sinal de vida com a orientação da máquina e consulta periodicamente o que exibir; o WebSocket é uma próxima etapa.
 
 ## Estrutura do repositório
 
@@ -37,7 +37,7 @@ python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 uvicorn main:app --reload --port 8000
-pytest                           # 24 testes
+pytest                           # 70 testes
 ```
 
 Documentação interativa da API: http://localhost:8000/docs
@@ -56,7 +56,7 @@ npm install
 npm run dev                      # http://localhost:3001
 ```
 
-Enquanto a integração não é concluída, o dashboard usa rotas simuladas internas. A API em `backend/` replica o mesmo contrato, então a troca é direta.
+Enquanto a integração não é concluída, o dashboard e o player usam rotas simuladas internas, com o contrato antigo. O que muda na troca está no [guia de integração](backend/README.md#guia-de-integração-do-front).
 
 ## API em resumo
 
@@ -69,7 +69,7 @@ Enquanto a integração não é concluída, o dashboard usa rotas simuladas inte
 | `GET/PUT /api/settings` | consulta e escolhe a imagem de stand-by |
 | `GET /api/clients` | lista as telas |
 | `PUT /api/clients/{id}/content` | define o que a tela exibe: experiência, imagem ou nada |
-| `PUT /api/clients/{id}/display` | liga ou desliga a tela |
+| `POST /api/clients/{id}/heartbeat` | sinal de vida da tela, com orientação e resolução |
 | `GET /api/clients/{id}/display` | o que o player deve exibir agora |
 | `PUT /api/clients/{id}/position` | move a tela na planta |
 | `PUT /api/clients/{id}/lock` | trava ou destrava a posição |
@@ -81,7 +81,8 @@ Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
 
 - [x] Dashboard com planta, trava de posição e Modo foco (com API simulada)
 - [x] Back-end, fatia 1: contrato do front e 24 testes
-- [x] Back-end: novo modelo de tela, catálogo de imagens, stand-by global e atribuição de conteúdo (43 testes)
+- [x] Back-end: novo modelo de tela, catálogo de imagens, stand-by global e atribuição de conteúdo
+- [x] Back-end: sinal de vida, 5 estados, aviso de orientação, Modo foco como camada e CORS restrito (70 testes)
 - [ ] Integração entre front-end e back-end
 - [ ] Persistência em banco de dados
 - [ ] Tempo real com WebSocket
