@@ -34,7 +34,7 @@ def test_list_clients_camel_case():
     r = client.get("/api/clients")
     assert r.status_code == 200
     assert set(r.json()[0]) == {
-        "id", "name", "status",
+        "id", "name", "status", "orientationMismatch",
         "currentExperienceId", "imgId", "displayImg", "displayOff",
         "reportedOrientation", "reportedResolution", "lastSeenAt",
         "x", "y", "locked",
@@ -270,15 +270,15 @@ def advance_clock(seconds):
 
 def test_seed_status_comes_from_last_seen():
     tela = screens()
-    assert tela["cli-1"]["status"] == "online" and tela["cli-1"]["lastSeenAt"] is not None
-    assert tela["cli-4"]["status"] == "offline" and tela["cli-4"]["lastSeenAt"] is None
+    assert tela["cli-1"]["status"] == "busy" and tela["cli-1"]["lastSeenAt"] is not None
+    assert tela["cli-4"]["status"] == "off" and tela["cli-4"]["lastSeenAt"] is None
 
 
 def test_heartbeat_brings_screen_online_and_records_info():
     r = heartbeat("cli-4", {"orientation": "portrait", "resolution": "1080x1920"})
     assert r.status_code == 204
     tela = screens()["cli-4"]
-    assert tela["status"] == "online"
+    assert tela["status"] == "standby"  # ligada, sem conteudo
     assert tela["reportedOrientation"] == "portrait"
     assert tela["reportedResolution"] == "1080x1920"
     assert tela["lastSeenAt"] is not None
@@ -295,17 +295,17 @@ def test_heartbeat_resolution_is_optional():
 def test_screen_goes_offline_after_timeout_and_keeps_content():
     advance_clock(16)  # passou do limite de 15 s sem sinal
     tela = screens()["cli-1"]
-    assert tela["status"] == "offline"
+    assert tela["status"] == "off"
     assert tela["currentExperienceId"] == "exp-1"  # a atribuicao fica guardada
     heartbeat("cli-1", {"orientation": "landscape"})
     tela = screens()["cli-1"]
-    assert tela["status"] == "online"
+    assert tela["status"] == "busy"
     assert tela["currentExperienceId"] == "exp-1"  # volta exibindo o mesmo
 
 
 def test_screen_still_online_within_timeout():
     advance_clock(10)
-    assert screens()["cli-1"]["status"] == "online"
+    assert screens()["cli-1"]["status"] == "busy"
 
 
 def test_heartbeat_errors():
@@ -324,6 +324,68 @@ def test_focus_rejects_screen_that_stopped_responding():
     r = client.post("/api/focus", json={"clientId": "cli-1"})
     assert r.status_code == 422 and r.json() == {"error": "A tela está offline"}
 
+
+# ---------- status da tela (5 estados) e orientacao ----------
+
+def test_seed_statuses():
+    tela = screens()
+    assert tela["cli-1"]["status"] == "busy"     # exibe experiencia
+    assert tela["cli-2"]["status"] == "paused"   # escurecida (provisorio: displayOff)
+    assert tela["cli-3"]["status"] == "busy"     # exibe imagem
+    assert tela["cli-4"]["status"] == "off"      # nunca deu sinal
+
+
+def test_status_standby_when_no_content():
+    r = put_content("cli-1", {"experienceId": None})
+    assert r.json()["status"] == "standby"
+
+
+def test_orientation_mismatch_is_error():
+    # exp-1 e para paisagem; a tela passa a informar retrato.
+    heartbeat("cli-1", {"orientation": "portrait"})
+    tela = screens()["cli-1"]
+    assert tela["orientationMismatch"] is True and tela["status"] == "error"
+    # Trocar por uma experiencia "qualquer orientacao" resolve.
+    r = put_content("cli-1", {"experienceId": "exp-2"})
+    assert r.json()["orientationMismatch"] is False and r.json()["status"] == "busy"
+
+
+def test_orientation_mismatch_with_image():
+    heartbeat("cli-3", {"orientation": "landscape"})  # img-1 e para retrato
+    assert screens()["cli-3"]["status"] == "error"
+
+
+def test_standby_never_flags_orientation():
+    put_content("cli-1", {"experienceId": None})
+    heartbeat("cli-1", {"orientation": "portrait"})
+    tela = screens()["cli-1"]
+    assert tela["status"] == "standby" and tela["orientationMismatch"] is False
+
+
+def test_paused_wins_over_error():
+    heartbeat("cli-2", {"orientation": "portrait"})
+    put_content("cli-2", {"experienceId": "exp-1"})      # religa (provisorio)
+    client.put("/api/clients/cli-2/display", json={"displayOff": True})
+    tela = screens()["cli-2"]
+    assert tela["orientationMismatch"] is True and tela["status"] == "paused"
+
+
+def test_off_wins_over_everything():
+    heartbeat("cli-1", {"orientation": "portrait"})  # erro de orientacao
+    advance_clock(16)
+    tela = screens()["cli-1"]
+    assert tela["status"] == "off"
+    assert tela["orientationMismatch"] is True  # o aviso continua visivel
+
+
+def test_content_on_offline_screen_reports_off():
+    # O front usa este status para dizer "sera exibido quando a tela voltar"
+    # em vez de um "Concluido" falso.
+    r = put_content("cli-4", {"experienceId": "exp-1"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "off"
+    assert r.json()["currentExperienceId"] == "exp-1"
+    
 
 def test_set_display():
     r = client.put("/api/clients/cli-1/display", json={"displayOff": True})

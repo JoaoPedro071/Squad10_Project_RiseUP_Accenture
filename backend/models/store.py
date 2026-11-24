@@ -10,7 +10,12 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from config import HEARTBEAT_TIMEOUT_SECONDS
-from models.seed import seed_clients, seed_experiences, seed_images
+from models.seed import (
+    ONLINE_AT_START,
+    seed_clients,
+    seed_experiences,
+    seed_images,
+)
 from schemas.client import Client
 from schemas.display import (
     DisplayOff,
@@ -39,7 +44,7 @@ class InMemoryStore:
         # As telas do seed marcadas como online "acabaram de dar sinal".
         # Sem o player rodando, elas ficam desligadas apos o tempo limite.
         for client in self._clients:
-            if client.status == "online":
+            if client.id in ONLINE_AT_START:
                 client.last_seen_at = self._clock()
 
     # --- leitura ---
@@ -67,12 +72,42 @@ class InMemoryStore:
         return client
 
     # --- sinal de vida ---
-    def _refresh_status(self, client: Client) -> None:
-        """online = deu sinal de vida dentro do tempo limite."""
+    def is_alive(self, client: Client) -> bool:
+        """Deu sinal de vida dentro do tempo limite."""
         limit = timedelta(seconds=HEARTBEAT_TIMEOUT_SECONDS)
         seen = client.last_seen_at
-        alive = seen is not None and self._clock() - seen <= limit
-        client.status = "online" if alive else "offline"
+        return seen is not None and self._clock() - seen <= limit
+
+    def _shown_orientation(self, client: Client) -> str | None:
+        """Orientacao do conteudo que a tela exibe agora (None = nada exibido)."""
+        if client.display_img and client.img_id:
+            image = self.find_image(client.img_id)
+            return image.orientation if image else None
+        if client.current_experience_id:
+            experience = self.find_experience(client.current_experience_id)
+            return experience.orientation if experience else None
+        return None
+
+    def _refresh_status(self, client: Client) -> None:
+        """Calcula o estado da tela. Prioridade:
+        Desligada > Em pausa > Erro > Em uso > Stand-by."""
+        content = self._shown_orientation(client)
+        client.orientation_mismatch = (
+            content is not None
+            and content != "any"
+            and client.reported_orientation is not None
+            and content != client.reported_orientation
+        )
+        if not self.is_alive(client):
+            client.status = "off"
+        elif client.display_off:  # provisorio: vira a camada do Modo foco na Etapa 8
+            client.status = "paused"
+        elif client.orientation_mismatch:
+            client.status = "error"
+        elif content is not None:
+            client.status = "busy"
+        else:
+            client.status = "standby"
 
     def record_heartbeat(
         self, client_id: str, orientation: str, resolution: str | None
@@ -133,6 +168,7 @@ class InMemoryStore:
         client.display_img = display_img
         # Provisorio (sai na Etapa 8): escolher conteudo religa a tela.
         client.display_off = False
+        self._refresh_status(client)
         return client
 
     def create_experience(self, data: dict) -> Experience:
@@ -187,12 +223,12 @@ class InMemoryStore:
         focused = self.find_client(client_id)
         if focused is None:
             return "not_found"
-        if focused.status == "offline":
+        if not self.is_alive(focused):
             return "offline"
 
         others = [c for c in self.list_clients() if c.id != focused.id]
-        to_darken = [c for c in others if c.status == "online" and not c.display_off]
-        offline = [c for c in others if c.status == "offline"]
+        to_darken = [c for c in others if self.is_alive(c) and not c.display_off]
+        offline = [c for c in others if not self.is_alive(c)]
 
         # So apaga as que estavam ligadas; as ja desligadas continuam como estao.
         for client in to_darken:

@@ -34,21 +34,26 @@ def seed_images() -> list[Image]:
     ]
 
 
+# Telas que "acabaram de dar sinal" quando o servidor sobe. Sem o player
+# rodando, elas ficam desligadas apos o tempo limite do sinal de vida.
+ONLINE_AT_START = {"cli-1", "cli-2", "cli-3"}
+
+
 def seed_clients() -> list[Client]:
     return [
-        Client(id="cli-1", name="Monitor Entrada", status="online",
+        Client(id="cli-1", name="Monitor Entrada",
                current_experience_id="exp-1",
                reported_orientation="landscape", reported_resolution="1920x1080",
                x=25, y=30, locked=True),
-        Client(id="cli-2", name="TV Sala de Reunião", status="online",
+        Client(id="cli-2", name="TV Sala de Reunião",
                display_off=True,
                reported_orientation="landscape", reported_resolution="3840x2160",
                x=75, y=30, locked=True),
-        Client(id="cli-3", name="Tablet Recepção", status="online",
+        Client(id="cli-3", name="Tablet Recepção",
                img_id="img-1", display_img=True,
                reported_orientation="portrait", reported_resolution="1080x1920",
                x=25, y=72),
-        # Offline: nunca enviou sinal de vida, entao nao informou orientacao.
-        Client(id="cli-4", name="Monitor Touch Central", status="offline",
+        # Nunca enviou sinal de vida: comeca desligada e sem orientacao.
+        Client(id="cli-4", name="Monitor Touch Central",
                x=75, y=72),
     ]
