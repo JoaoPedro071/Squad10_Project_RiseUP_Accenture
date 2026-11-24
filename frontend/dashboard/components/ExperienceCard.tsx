@@ -1,13 +1,8 @@
-import type { Experience } from "@/types/experience";
+import { orientationLabel } from "@/lib/orientation";
+import type { Experience } from "@/types/api";
 
 type ExperienceCardProps = {
   experience: Experience;
-};
-
-const orientationLabel = {
-  landscape: "Paisagem",
-  portrait: "Retrato",
-  any: "Qualquer orientação",
 };
 
 export default function ExperienceCard({ experience }: ExperienceCardProps) {
@@ -27,8 +22,7 @@ export default function ExperienceCard({ experience }: ExperienceCardProps) {
       </div>
       <p className="mt-2 text-sm text-foreground/80">{experience.description}</p>
       <p className="mt-3 text-xs text-foreground/60">
-        {experience.type === "web" ? "Página web" : "Imagem"} ·{" "}
-        {orientationLabel[experience.orientation]}
+        Página web · {orientationLabel[experience.orientation]}
       </p>
     </article>
   );

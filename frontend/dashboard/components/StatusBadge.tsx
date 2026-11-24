@@ -1,24 +1,9 @@
-type StatusBadgeProps = {
-  status: "online" | "offline" | "standby";
-  size?: "sm" | "md";
-};
+import { statusConfig } from "@/lib/status";
+import type { ScreenStatus } from "@/types/api";
 
-const config = {
-  online: {
-    icon: "●",
-    label: "Online",
-    style: "text-green-400 border-green-400/50",
-  },
-  offline: {
-    icon: "○",
-    label: "Offline",
-    style: "text-red-400 border-red-400/50",
-  },
-  standby: {
-    icon: "■",
-    label: "Tela desligada",
-    style: "text-yellow-300 border-yellow-300/50",
-  },
+type StatusBadgeProps = {
+  status: ScreenStatus;
+  size?: "sm" | "md";
 };
 
 const sizes = {
@@ -27,7 +12,7 @@ const sizes = {
 };
 
 export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
-  const { icon, label, style } = config[status];
+  const { icon, label, style } = statusConfig[status];
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border font-medium ${sizes[size]} ${style}`}

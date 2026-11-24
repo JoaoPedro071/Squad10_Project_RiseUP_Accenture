@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Client } from "@/types/client";
+import type { Client } from "@/types/api";
 
 type LockModalProps = {
   client: Client;

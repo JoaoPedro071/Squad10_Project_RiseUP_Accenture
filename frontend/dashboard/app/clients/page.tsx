@@ -1,23 +1,26 @@
 import ClientsBoard from "@/components/ClientsBoard";
-import { getFocus, listClients, listExperiences } from "@/lib/store";
+import { fetchExperiences, fetchImages, fetchState } from "@/services/api";
 
 export const dynamic = "force-dynamic";
 
-export default function ClientsPage() {
-  const clients = listClients();
-  const experiences = listExperiences();
-  const focus = getFocus();
+export default async function ClientsPage() {
+  const [state, experiences, images] = await Promise.all([
+    fetchState(),
+    fetchExperiences(),
+    fetchImages(),
+  ]);
 
   return (
     <section>
       <h1 className="mb-4 text-2xl font-bold">Telas</h1>
-      {clients.length === 0 ? (
-        <p>Nenhuma tela conectada.</p>
+      {state.clients.length === 0 ? (
+        <p>Nenhuma tela cadastrada.</p>
       ) : (
         <ClientsBoard
-          initialClients={clients}
+          initialClients={state.clients}
+          initialFocus={state.focus}
           experiences={experiences}
-          initialFocus={focus}
+          images={images}
         />
       )}
     </section>

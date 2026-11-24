@@ -1,118 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import type { Client } from "@/types/client";
-import type { Experience } from "@/types/experience";
-import type { FocusState } from "@/types/focus";
-import {
-  assignExperience,
-  endFocus,
-  setDisplayOff,
-  startFocus,
-} from "@/services/api";
+import { useBoard } from "@/hooks/useBoard";
+import type { Client, Experience, FocusState, Image } from "@/types/api";
 import ClientCard from "./ClientCard";
-import ExperienceModal from "./ExperienceModal";
 import FocusBanner from "./FocusBanner";
 import FocusModal from "./FocusModal";
+import ScreenModal from "./ScreenModal";
+
+const POLL_MS = 3000;
 
 type ClientsBoardProps = {
   initialClients: Client[];
-  experiences: Experience[];
   initialFocus: FocusState | null;
+  experiences: Experience[];
+  images: Image[];
 };
 
 export default function ClientsBoard({
   initialClients,
-  experiences,
   initialFocus,
+  experiences,
+  images,
 }: ClientsBoardProps) {
-  const [clients, setClients] = useState(initialClients);
-  const [focus, setFocus] = useState(initialFocus);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [focusBusy, setFocusBusy] = useState(false);
+  const board = useBoard(initialClients, initialFocus, POLL_MS);
+  const { clients, focus } = board;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [focusTargetId, setFocusTargetId] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
 
-  const editingClient = clients.find((c) => c.id === editingId);
+  const editing = clients.find((c) => c.id === editingId);
   const focusTarget = clients.find((c) => c.id === focusTargetId);
-
-  function replaceClient(updated: Client) {
-    setClients((current) =>
-      current.map((c) => (c.id === updated.id ? updated : c)),
-    );
-  }
-
-  async function handleToggleDisplay(client: Client) {
-    setBusyId(client.id);
-    setMessage("Atualizando...");
-    try {
-      const updated = await setDisplayOff(client.id, !client.displayOff);
-      replaceClient(updated);
-      setMessage("Concluído. A tela atualiza em instantes.");
-    } catch {
-      setMessage("Não foi possível concluir a ação. Tente novamente.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleConfirmExperience(experienceId: string) {
-    const clientId = editingId;
-    if (!clientId) return;
-
-    setEditingId(null);
-    setBusyId(clientId);
-    setMessage("Atualizando...");
-    try {
-      const updated = await assignExperience(clientId, experienceId);
-      replaceClient(updated);
-      setMessage("Concluído. A tela atualiza em instantes.");
-    } catch {
-      setMessage("Não foi possível trocar a experiência. Tente novamente.");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleStartFocus() {
-    const clientId = focusTargetId;
-    if (!clientId) return;
-
-    setFocusTargetId(null);
-    setFocusBusy(true);
-    setMessage("Atualizando...");
-    try {
-      const result = await startFocus(clientId);
-      setClients(result.clients);
-      setFocus(result.focus);
-      const offline = result.focus?.offlineIds.length ?? 0;
-      setMessage(
-        offline > 0
-          ? `Modo foco ativo, parcial: ${offline} tela(s) offline não foram apagadas.`
-          : "Concluído. Modo foco ativo.",
-      );
-    } catch {
-      setMessage("Não foi possível ativar o modo foco. Tente novamente.");
-    } finally {
-      setFocusBusy(false);
-    }
-  }
-
-  async function handleEndFocus() {
-    setFocusBusy(true);
-    setMessage("Atualizando...");
-    try {
-      const result = await endFocus();
-      setClients(result.clients);
-      setFocus(result.focus);
-      setMessage("Concluído. As telas foram restauradas.");
-    } catch {
-      setMessage("Não foi possível sair do modo foco. Tente novamente.");
-    } finally {
-      setFocusBusy(false);
-    }
-  }
+  const focusActive = focus !== null || board.focusBusy;
 
   return (
     <>
@@ -120,8 +38,8 @@ export default function ClientsBoard({
         <FocusBanner
           focus={focus}
           clients={clients}
-          busy={focusBusy}
-          onExit={handleEndFocus}
+          busy={board.focusBusy}
+          onExit={board.exitFocus}
         />
       )}
 
@@ -130,7 +48,7 @@ export default function ClientsBoard({
         aria-live="polite"
         className="mb-4 min-h-6 text-sm text-foreground/80"
       >
-        {message}
+        {board.message}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -138,23 +56,32 @@ export default function ClientsBoard({
           <ClientCard
             key={client.id}
             client={client}
-            experiences={experiences}
-            busy={busyId === client.id}
-            onToggleDisplay={() => handleToggleDisplay(client)}
-            onChangeExperience={() => setEditingId(client.id)}
-            focusActive={focus !== null || focusBusy}
+            catalog={{ experiences, images }}
+            busy={board.busyId === client.id}
+            focusActive={focusActive}
+            onConfigure={() => setEditingId(client.id)}
             onFocus={() => setFocusTargetId(client.id)}
           />
         ))}
       </div>
 
-      {editingClient && (
-        <ExperienceModal
-          key={`experience-${editingClient.id}`}
-          client={editingClient}
+      {editing && (
+        <ScreenModal
+          key={`screen-${editing.id}`}
+          client={editing}
           experiences={experiences}
+          images={images}
+          busy={board.busyId === editing.id}
+          focusActive={focusActive}
           onClose={() => setEditingId(null)}
-          onConfirm={handleConfirmExperience}
+          onUpdate={(update) => {
+            board.updateContent(editing.id, update);
+            setEditingId(null);
+          }}
+          onFocus={() => {
+            setEditingId(null);
+            setFocusTargetId(editing.id);
+          }}
         />
       )}
 
@@ -164,7 +91,10 @@ export default function ClientsBoard({
           client={focusTarget}
           clients={clients}
           onClose={() => setFocusTargetId(null)}
-          onConfirm={handleStartFocus}
+          onConfirm={() => {
+            setFocusTargetId(null);
+            board.startFocusFor(focusTarget.id);
+          }}
         />
       )}
     </>

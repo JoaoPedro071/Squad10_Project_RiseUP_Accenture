@@ -1,4 +1,4 @@
-import type { Experience } from "@/types/experience";
+import type { Experience } from "@/types/api";
 
 export type ExperienceInput = {
   title: string;
@@ -10,7 +10,7 @@ export type ExperienceInput = {
 
 export type FieldErrors = Partial<Record<keyof ExperienceInput, string>>;
 
-const types = ["web", "image"];
+const types = ["web"]; // imagens têm catálogo próprio
 const orientations = ["landscape", "portrait", "any"];
 
 function isValidUrl(value: string): boolean {
@@ -45,6 +45,41 @@ export function validateExperience(input: Partial<ExperienceInput>): FieldErrors
   if (!input.type || !types.includes(input.type)) {
     errors.type = "Escolha o tipo de conteúdo.";
   }
+  if (!input.orientation || !orientations.includes(input.orientation)) {
+    errors.orientation = "Escolha a orientação.";
+  }
+  return errors;
+}
+
+
+// --- imagens (mesmas regras e mensagens do backend) ---
+export type ImageInput = {
+  title: string;
+  description: string;
+  url: string;
+  orientation: Experience["orientation"];
+};
+
+export type ImageFieldErrors = Partial<Record<keyof ImageInput, string>>;
+
+export function validateImage(input: Partial<ImageInput>): ImageFieldErrors {
+  const errors: ImageFieldErrors = {};
+  const title = String(input.title ?? "").trim();
+  const description = String(input.description ?? "");
+  const url = String(input.url ?? "").trim();
+
+  if (!title) errors.title = "Informe o título da imagem.";
+  else if (title.length > 80) errors.title = "Use no máximo 80 caracteres no título.";
+
+  if (description.length > 300) {
+    errors.description = "Use no máximo 300 caracteres na descrição.";
+  }
+
+  if (!url) errors.url = "Informe o endereço da imagem.";
+  else if (!isValidUrl(url)) {
+    errors.url = "Use um endereço começando com http:// ou https://.";
+  }
+
   if (!input.orientation || !orientations.includes(input.orientation)) {
     errors.orientation = "Escolha a orientação.";
   }

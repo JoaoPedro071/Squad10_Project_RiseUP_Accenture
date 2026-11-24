@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { planFocus } from "@/lib/focus";
-import type { Client } from "@/types/client";
+import type { Client } from "@/types/api";
 
 type FocusModalProps = {
   client: Client;
@@ -26,8 +25,9 @@ export default function FocusModal({
     }
   }, []);
 
-  const plan = planFocus(clients, client.id);
-  if (!plan) return null;
+  const others = clients.filter((c) => c.id !== client.id);
+  const connected = others.filter((c) => c.status !== "off");
+  const off = others.filter((c) => c.status === "off");
 
   return (
     <dialog
@@ -37,34 +37,27 @@ export default function FocusModal({
       className="m-auto w-full max-w-md rounded-lg border border-border bg-surface p-6 text-foreground backdrop:bg-black/60"
     >
       <h2 id="focus-title" className="text-lg font-semibold">
-        Ativar modo foco
+        Ativar Modo foco
       </h2>
-      <p className="mt-1 text-sm text-foreground/70">
-        Apresentar em {client.name} · {client.room}
-      </p>
+      <p className="mt-1 text-sm text-foreground/70">Apresentar em {client.name}</p>
 
       <div className="mt-4 text-sm">
-        <p className="font-medium">As telas abaixo ficarão pretas:</p>
-        {plan.toDarken.length > 0 ? (
+        <p className="font-medium">Estas telas ficarão em pausa (tela preta):</p>
+        {connected.length > 0 ? (
           <ul className="mt-1 list-disc pl-5">
-            {plan.toDarken.map((c) => (
+            {connected.map((c) => (
               <li key={c.id}>{c.name}</li>
             ))}
           </ul>
         ) : (
-          <p className="mt-1 text-foreground/70">
-            Nenhuma outra tela ligada nesta sala.
-          </p>
+          <p className="mt-1 text-foreground/70">Nenhuma outra tela conectada.</p>
         )}
 
-        {plan.offline.length > 0 && (
-          <div className="mt-3 text-yellow-300">
-            <p>
-              <span aria-hidden="true">⚠ </span>
-              Offline, não serão apagadas (resultado parcial):
-            </p>
+        {off.length > 0 && (
+          <div className="mt-3 text-foreground/70">
+            <p>Desligadas agora (entram em pausa se reconectarem durante o foco):</p>
             <ul className="mt-1 list-disc pl-5">
-              {plan.offline.map((c) => (
+              {off.map((c) => (
                 <li key={c.id}>{c.name}</li>
               ))}
             </ul>
@@ -72,7 +65,8 @@ export default function FocusModal({
         )}
 
         <p className="mt-3 text-xs text-foreground/60">
-          A tela fica preta, mas o equipamento não é desligado.
+          Nenhum conteúdo é alterado: ao sair do foco, cada tela volta ao que
+          tinha. A tela fica preta, mas o equipamento não é desligado.
         </p>
       </div>
 
@@ -89,7 +83,7 @@ export default function FocusModal({
           onClick={onConfirm}
           className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          Confirmar modo foco
+          Confirmar Modo foco
         </button>
       </div>
     </dialog>

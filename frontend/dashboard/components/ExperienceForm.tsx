@@ -21,7 +21,6 @@ const fieldOrder: (keyof ExperienceInput)[] = [
   "title",
   "description",
   "url",
-  "type",
   "orientation",
 ];
 
@@ -89,7 +88,11 @@ export default function ExperienceForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex max-w-xl flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="flex max-w-xl flex-col gap-4"
+    >
       <div>
         <label htmlFor="field-title" className="mb-1 block text-sm font-medium">
           Título
@@ -108,7 +111,10 @@ export default function ExperienceForm() {
       </div>
 
       <div>
-        <label htmlFor="field-description" className="mb-1 block text-sm font-medium">
+        <label
+          htmlFor="field-description"
+          className="mb-1 block text-sm font-medium"
+        >
           Descrição (opcional)
         </label>
         <textarea
@@ -118,7 +124,9 @@ export default function ExperienceForm() {
           onChange={(e) => setField("description", e.target.value)}
           onBlur={() => validateField("description")}
           aria-invalid={errors.description ? true : undefined}
-          aria-describedby={errors.description ? "error-description" : undefined}
+          aria-describedby={
+            errors.description ? "error-description" : undefined
+          }
           className={`${inputClass(!!errors.description)} py-2`}
         />
         <FieldError id="error-description" message={errors.description} />
@@ -143,35 +151,25 @@ export default function ExperienceForm() {
       </div>
 
       <div>
-        <label htmlFor="field-type" className="mb-1 block text-sm font-medium">
-          Tipo de conteúdo
-        </label>
-        <select
-          id="field-type"
-          value={values.type}
-          onChange={(e) => setField("type", e.target.value as ExperienceInput["type"])}
-          aria-invalid={errors.type ? true : undefined}
-          aria-describedby={errors.type ? "error-type" : undefined}
-          className={inputClass(!!errors.type)}
+        <label
+          htmlFor="field-orientation"
+          className="mb-1 block text-sm font-medium"
         >
-          <option value="web">Página web</option>
-          <option value="image">Imagem</option>
-        </select>
-        <FieldError id="error-type" message={errors.type} />
-      </div>
-
-      <div>
-        <label htmlFor="field-orientation" className="mb-1 block text-sm font-medium">
           Orientação
         </label>
         <select
           id="field-orientation"
           value={values.orientation}
           onChange={(e) =>
-            setField("orientation", e.target.value as ExperienceInput["orientation"])
+            setField(
+              "orientation",
+              e.target.value as ExperienceInput["orientation"],
+            )
           }
           aria-invalid={errors.orientation ? true : undefined}
-          aria-describedby={errors.orientation ? "error-orientation" : undefined}
+          aria-describedby={
+            errors.orientation ? "error-orientation" : undefined
+          }
           className={inputClass(!!errors.orientation)}
         >
           <option value="any">Qualquer orientação</option>
