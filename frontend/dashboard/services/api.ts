@@ -1,6 +1,6 @@
 // Chamadas ao backend FastAPI. Funciona no navegador e nas páginas do servidor.
 import { API_URL } from "@/lib/config";
-import type { ExperienceInput } from "@/lib/validation";
+import type { ExperienceInput, ImageInput } from "@/lib/validation";
 import type {
   Client,
   ContentUpdate,
@@ -80,3 +80,11 @@ export const endFocus = () => request<FocusResponse>("/api/focus", "DELETE");
 // --- catálogo ---
 export const createExperience = (input: ExperienceInput) =>
   request<Experience>("/api/experiences", "POST", input);
+
+
+export const createImage = (input: ImageInput) =>
+  request<Image>("/api/images", "POST", input);
+
+/** Inativar não apaga: só impede novas atribuições. */
+export const setImageActive = (imageId: string, active: boolean) =>
+  request<Image>(`/api/images/${imageId}/active`, "PUT", { active });
