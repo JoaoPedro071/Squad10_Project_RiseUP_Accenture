@@ -6,18 +6,28 @@ from schemas.base import CamelModel
 ScreenOrientation = Literal["landscape", "portrait"]
 
 
+# Estados da tela (calculados pelo backend, nunca enviados pelo front):
+#   busy     Em uso     exibe uma experiencia ou imagem
+#   standby  Stand-by   conectada, sem conteudo atribuido
+#   paused   Em pausa   escurecida pelo Modo foco
+#   error    Erro       orientacao da tela nao combina com o conteudo
+#   off      Desligada  sem sinal de vida
+ScreenStatus = Literal["busy", "standby", "paused", "error", "off"]
+
 class Client(CamelModel):
     id: str
     name: str
-    # Provisorio: vira status derivado (5 estados) na Etapa 6.
-    status: Literal["online", "offline"]
+
+    # Calculados pelo backend a cada consulta (ver ScreenStatus acima).
+    status: ScreenStatus = "off"
+    # true = a orientacao da tela nao combina com o que ela esta exibindo
+    # (o "icone de erro de configuracao" pedido pelo Bruno).
+    orientation_mismatch: bool = False
 
     # --- o que a tela deve exibir ---
     current_experience_id: str | None = None
     img_id: str | None = None
     display_img: bool = False  # true = exibe a imagem (img_id) no lugar da experiencia
-    # Provisorio: sai na Etapa 8, quando o Modo foco vira uma camada.
-    display_off: bool = False
 
     # --- informado pela propria tela (sinal de vida, Etapa 5) ---
     reported_orientation: ScreenOrientation | None = None
@@ -41,8 +51,11 @@ class ContentUpdate(CamelModel):
     display_img: Any = None
 
 
-class DisplayUpdate(CamelModel):
-    display_off: Any = None
+class HeartbeatUpdate(CamelModel):
+    """Corpo do POST /api/clients/{id}/heartbeat, enviado pela propria tela."""
+
+    orientation: Any = None
+    resolution: Any = None  # opcional, ex.: "1920x1080"
 
 
 class PositionUpdate(CamelModel):

@@ -1,6 +1,8 @@
+from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from config import load_cors_origins
 from main import app
 from models.store import store
 
@@ -33,8 +35,8 @@ def test_list_clients_camel_case():
     r = client.get("/api/clients")
     assert r.status_code == 200
     assert set(r.json()[0]) == {
-        "id", "name", "status",
-        "currentExperienceId", "imgId", "displayImg", "displayOff",
+        "id", "name", "status", "orientationMismatch",
+        "currentExperienceId", "imgId", "displayImg",
         "reportedOrientation", "reportedResolution", "lastSeenAt",
         "x", "y", "locked",
     }
@@ -245,47 +247,240 @@ def test_content_unknown_client():
     assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
 
 
-def test_content_turns_display_on_provisional():
-    # Comportamento antigo mantido ate a Etapa 8 (Modo foco como camada).
-    r = put_content("cli-2", {"experienceId": "exp-3"})
-    assert r.json()["displayOff"] is False
+# ---------- sinal de vida ----------
 
-def test_set_display():
-    r = client.put("/api/clients/cli-1/display", json={"displayOff": True})
-    assert r.status_code == 200 and r.json()["displayOff"] is True
-    assert client.put("/api/clients/cli-1/display", json={"displayOff": "sim"}).status_code == 422
-    assert client.put("/api/clients/xxx/display", json={"displayOff": True}).status_code == 404
+def heartbeat(client_id, body):
+    return client.post(f"/api/clients/{client_id}/heartbeat", json=body)
 
 
-def test_display_states():
-    showing = client.get("/api/clients/cli-1/display")
-    assert showing.status_code == 200
-    assert showing.headers["cache-control"] == "no-store"
-    assert showing.json()["kind"] == "showing"
-    assert showing.json()["experience"]["id"] == "exp-1"
+def screens():
+    return {c["id"]: c for c in client.get("/api/clients").json()}
 
-    assert client.get("/api/clients/cli-2/display").json() == {"kind": "off"}
-    assert client.get("/api/clients/cli-4/display").json() == {"kind": "waiting"}
-    r = client.get("/api/clients/xxx/display")
+
+def advance_clock(seconds):
+    """Simula o tempo passando, sem precisar esperar de verdade."""
+    current = store._clock()
+    store._clock = lambda: current + timedelta(seconds=seconds)
+
+
+def test_seed_status_comes_from_last_seen():
+    tela = screens()
+    assert tela["cli-1"]["status"] == "busy" and tela["cli-1"]["lastSeenAt"] is not None
+    assert tela["cli-4"]["status"] == "off" and tela["cli-4"]["lastSeenAt"] is None
+
+
+def test_heartbeat_brings_screen_online_and_records_info():
+    r = heartbeat("cli-4", {"orientation": "portrait", "resolution": "1080x1920"})
+    assert r.status_code == 204
+    tela = screens()["cli-4"]
+    assert tela["status"] == "standby"  # ligada, sem conteudo
+    assert tela["reportedOrientation"] == "portrait"
+    assert tela["reportedResolution"] == "1080x1920"
+    assert tela["lastSeenAt"] is not None
+
+
+def test_heartbeat_resolution_is_optional():
+    r = heartbeat("cli-1", {"orientation": "portrait"})
+    assert r.status_code == 204
+    tela = screens()["cli-1"]
+    assert tela["reportedOrientation"] == "portrait"
+    assert tela["reportedResolution"] == "1920x1080"  # mantem a anterior
+
+
+def test_screen_goes_offline_after_timeout_and_keeps_content():
+    advance_clock(16)  # passou do limite de 15 s sem sinal
+    tela = screens()["cli-1"]
+    assert tela["status"] == "off"
+    assert tela["currentExperienceId"] == "exp-1"  # a atribuicao fica guardada
+    heartbeat("cli-1", {"orientation": "landscape"})
+    tela = screens()["cli-1"]
+    assert tela["status"] == "busy"
+    assert tela["currentExperienceId"] == "exp-1"  # volta exibindo o mesmo
+
+
+def test_screen_still_online_within_timeout():
+    advance_clock(10)
+    assert screens()["cli-1"]["status"] == "busy"
+
+
+def test_heartbeat_errors():
+    for body in ({}, {"orientation": "deitada"}, {"orientation": 1}):
+        r = heartbeat("cli-1", body)
+        assert r.status_code == 422 and r.json() == {"error": "Orientação inválida"}
+    for res in ("grande", "1920 x 1080", 1920):
+        r = heartbeat("cli-1", {"orientation": "landscape", "resolution": res})
+        assert r.status_code == 422 and r.json() == {"error": "Resolução inválida"}
+    r = heartbeat("xxx", {"orientation": "landscape"})
+    assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
+
+
+def test_focus_rejects_screen_that_stopped_responding():
+    advance_clock(16)
+    r = client.post("/api/focus", json={"clientId": "cli-1"})
+    assert r.status_code == 422 and r.json() == {"error": "A tela está offline"}
+
+
+# ---------- status da tela (5 estados) e orientacao ----------
+
+def test_seed_statuses():
+    tela = screens()
+    assert tela["cli-1"]["status"] == "busy"     # exibe experiencia
+    assert tela["cli-2"]["status"] == "standby"  # ligada, sem conteudo
+    assert tela["cli-3"]["status"] == "busy"     # exibe imagem
+    assert tela["cli-4"]["status"] == "off"      # nunca deu sinal
+
+
+def test_status_standby_when_no_content():
+    r = put_content("cli-1", {"experienceId": None})
+    assert r.json()["status"] == "standby"
+
+
+def test_orientation_mismatch_is_error():
+    # exp-1 e para paisagem; a tela passa a informar retrato.
+    heartbeat("cli-1", {"orientation": "portrait"})
+    tela = screens()["cli-1"]
+    assert tela["orientationMismatch"] is True and tela["status"] == "error"
+    # Trocar por uma experiencia "qualquer orientacao" resolve.
+    r = put_content("cli-1", {"experienceId": "exp-2"})
+    assert r.json()["orientationMismatch"] is False and r.json()["status"] == "busy"
+
+
+def test_orientation_mismatch_with_image():
+    heartbeat("cli-3", {"orientation": "landscape"})  # img-1 e para retrato
+    assert screens()["cli-3"]["status"] == "error"
+
+
+def test_standby_never_flags_orientation():
+    put_content("cli-1", {"experienceId": None})
+    heartbeat("cli-1", {"orientation": "portrait"})
+    tela = screens()["cli-1"]
+    assert tela["status"] == "standby" and tela["orientationMismatch"] is False
+
+
+def test_paused_wins_over_error():
+    heartbeat("cli-1", {"orientation": "portrait"})  # erro de orientacao
+    client.post("/api/focus", json={"clientId": "cli-3"})
+    tela = screens()["cli-1"]
+    assert tela["orientationMismatch"] is True and tela["status"] == "paused"
+
+
+def test_off_wins_over_everything():
+    heartbeat("cli-1", {"orientation": "portrait"})  # erro de orientacao
+    advance_clock(16)
+    tela = screens()["cli-1"]
+    assert tela["status"] == "off"
+    assert tela["orientationMismatch"] is True  # o aviso continua visivel
+
+
+def test_content_on_offline_screen_reports_off():
+    # O front usa este status para dizer "sera exibido quando a tela voltar"
+    # em vez de um "Concluido" falso.
+    r = put_content("cli-4", {"experienceId": "exp-1"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "off"
+    assert r.json()["currentExperienceId"] == "exp-1"
+
+
+# ---------- o que a tela exibe ----------
+
+def display(client_id):
+    return client.get(f"/api/clients/{client_id}/display")
+
+
+def test_display_experience():
+    r = display("cli-1")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "no-store"
+    assert r.json()["kind"] == "experience"
+    assert r.json()["experience"]["id"] == "exp-1"
+
+
+def test_display_image():
+    r = display("cli-3")
+    assert r.json()["kind"] == "image" and r.json()["image"]["id"] == "img-1"
+
+
+def test_display_paused_is_black():
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    assert display("cli-3").json() == {"kind": "paused"}
+
+
+def test_display_standby_without_image_is_black():
+    assert display("cli-4").json() == {"kind": "standby", "image": None}
+
+
+def test_display_standby_uses_global_image():
+    client.put("/api/settings", json={"standbyImageId": "img-1"})
+    r = display("cli-4").json()
+    assert r["kind"] == "standby" and r["image"]["id"] == "img-1"
+
+
+def test_display_toggle_between_image_and_experience():
+    put_content("cli-1", {"imgId": "img-1"})
+    assert display("cli-1").json()["kind"] == "image"
+    put_content("cli-1", {"displayImg": False})
+    assert display("cli-1").json()["kind"] == "experience"
+
+
+def test_display_image_removed_falls_back_to_standby():
+    put_content("cli-3", {"imgId": None})  # o tablet nao tem experiencia
+    assert display("cli-3").json()["kind"] == "standby"
+
+
+def test_display_keeps_inactivated_item_until_changed():
+    client.put("/api/images/img-1/active", json={"active": False})
+    assert display("cli-3").json()["kind"] == "image"  # continua (EC18)
+
+
+def test_display_unknown_screen():
+    r = display("xxx")
     assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
 
 
 def test_display_follows_dashboard_changes():
     put_content("cli-4", {"experienceId": "exp-2"})
-    assert client.get("/api/clients/cli-4/display").json()["experience"]["id"] == "exp-2"
-    client.put("/api/clients/cli-4/display", json={"displayOff": True})
-    assert client.get("/api/clients/cli-4/display").json() == {"kind": "off"}
+    assert display("cli-4").json()["experience"]["id"] == "exp-2"
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    assert display("cli-4").json() == {"kind": "paused"}
 
 
-def test_cors_preflight():
-    r = client.options(
+# ---------- CORS ----------
+
+def preflight(origin):
+    return client.options(
         "/api/clients/cli-1/content",
-        headers={"Origin": "http://localhost:3000",
+        headers={"Origin": origin,
                  "Access-Control-Request-Method": "PUT",
                  "Access-Control-Request-Headers": "content-type"},
     )
-    assert r.status_code == 200
-    assert r.headers["access-control-allow-origin"] in ("*", "http://localhost:3000")
+
+
+def test_cors_allows_dashboard_and_player():
+    for origin in ("http://localhost:3000", "http://localhost:3001"):
+        r = preflight(origin)
+        assert r.status_code == 200, origin
+        assert r.headers["access-control-allow-origin"] == origin
+
+
+def test_cors_blocks_unknown_site():
+    r = preflight("http://site-qualquer.com")
+    assert r.status_code == 400
+    assert "access-control-allow-origin" not in r.headers
+
+
+def test_cors_config_defaults_and_parsing():
+    padrao = ["http://localhost:3000", "http://localhost:3001"]
+    assert load_cors_origins(None, "development") == padrao
+    assert load_cors_origins("   ", "development") == padrao
+    assert load_cors_origins(" https://a.com , https://b.com ,", "production") == [
+        "https://a.com", "https://b.com"
+    ]
+
+
+def test_cors_wildcard_only_outside_production():
+    assert load_cors_origins("*", "development") == ["*"]
+    with pytest.raises(RuntimeError):
+        load_cors_origins("*", "production")
 
 
 def test_health():
@@ -338,17 +533,28 @@ def test_focus_initial_state():
     assert len(body["clients"]) == 4
 
 
-def test_focus_start_darkens_only_online_and_on():
+def test_focus_pauses_every_other_screen():
     r = client.post("/api/focus", json={"clientId": "cli-1"})
     assert r.status_code == 201
     body = r.json()
-    assert body["focus"] == {
-        "clientId": "cli-1", "affectedIds": ["cli-3"], "offlineIds": ["cli-4"]
-    }
-    by_id = {c["id"]: c for c in body["clients"]}
-    assert by_id["cli-3"]["displayOff"] is True    # estava ligada, apagou
-    assert by_id["cli-2"]["displayOff"] is True    # ja estava apagada
-    assert by_id["cli-1"]["displayOff"] is False   # a que apresenta
+    assert body["focus"] == {"clientId": "cli-1"}
+    status = {c["id"]: c["status"] for c in body["clients"]}
+    assert status["cli-1"] == "busy"     # a que apresenta segue exibindo
+    assert status["cli-2"] == "paused"
+    assert status["cli-3"] == "paused"
+    assert status["cli-4"] == "off"      # desligada continua desligada
+    assert display("cli-1").json()["kind"] == "experience"
+
+
+def test_focus_does_not_touch_assignments():
+    before = screens()
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    client.delete("/api/focus")
+    after = screens()
+    for cid in before:
+        for field in ("currentExperienceId", "imgId", "displayImg"):
+            assert after[cid][field] == before[cid][field]
+        assert after[cid]["status"] == before[cid]["status"]
 
 
 def test_focus_errors():
@@ -361,15 +567,28 @@ def test_focus_errors():
     assert again.json() == {"error": "O Modo foco já está ativo"}
 
 
-def test_focus_end_restores_only_affected():
+def test_content_changed_during_focus_appears_after():
     client.post("/api/focus", json={"clientId": "cli-1"})
-    r = client.delete("/api/focus")
+    r = put_content("cli-3", {"experienceId": "exp-2"})
     assert r.status_code == 200
-    body = r.json()
-    assert body["focus"] is None
-    by_id = {c["id"]: c for c in body["clients"]}
-    assert by_id["cli-3"]["displayOff"] is False   # voltou
-    assert by_id["cli-2"]["displayOff"] is True    # continua como estava
+    assert r.json()["status"] == "paused"               # segue pausada
+    assert display("cli-3").json() == {"kind": "paused"}
+    client.delete("/api/focus")
+    shown = display("cli-3").json()
+    assert shown["kind"] == "experience" and shown["experience"]["id"] == "exp-2"
+
+
+def test_screen_reconnecting_during_focus_comes_back_paused():
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    heartbeat("cli-4", {"orientation": "landscape"})   # estava desligada
+    assert screens()["cli-4"]["status"] == "paused"
+    assert display("cli-4").json() == {"kind": "paused"}
+
+
+def test_focused_screen_can_change_content():
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    put_content("cli-1", {"experienceId": "exp-3"})
+    assert display("cli-1").json()["experience"]["id"] == "exp-3"
 
 
 def test_focus_end_without_active_is_ok():

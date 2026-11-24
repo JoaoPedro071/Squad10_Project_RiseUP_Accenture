@@ -5,9 +5,13 @@ from schemas.client import Client
 
 
 class FocusState(CamelModel):
+    """Modo foco ativo: uma camada por cima das atribuicoes.
+
+    A tela em foco segue exibindo o seu conteudo; todas as outras ficam
+    Em pausa (tela preta). Nenhuma atribuicao e alterada.
+    """
+
     client_id: str  # tela que está apresentando
-    affected_ids: list[str]  # telas que foram apagadas (estavam ligadas)
-    offline_ids: list[str]  # telas offline, que não puderam ser apagadas
 
 
 class FocusStart(CamelModel):
