@@ -4,12 +4,15 @@ API que guarda o estado das telas e do catálogo, valida cada ação e informa a
 
 ## Rodar
 
+Requer o [uv](https://docs.astral.sh/uv/). Ele usa o Python 3.12 (`.python-version`) e o baixa se faltar.
+
 ```bash
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt
-uvicorn main:app --reload --port 8000
-pytest                                              # 70 testes
+uv sync                                         # cria o .venv e instala tudo
+uv run uvicorn main:app --reload --port 8000
+uv run pytest                                   # 70 testes
 ```
+
+Dependências: `uv add <pacote>` (app) ou `uv add --dev <pacote>` (só desenvolvimento). Sempre commite o `pyproject.toml` junto com o `uv.lock`.
 
 Docs interativas: http://localhost:8000/docs
 
@@ -179,6 +182,8 @@ Rótulos sugeridos para a interface: `busy` Em uso · `standby` Stand-by · `pau
 ## Estrutura
 
 ```
+pyproject.toml     dependências (uv) e configuração do pytest
+uv.lock            versões exatas das dependências (gerado pelo uv)
 main.py            app, CORS e routers
 config.py          variáveis de ambiente (APP_ENV, CORS_ORIGINS, HEARTBEAT_TIMEOUT_SECONDS)
 errors.py          formatos de erro que o front espera
