@@ -385,7 +385,7 @@ def test_content_on_offline_screen_reports_off():
     assert r.status_code == 200
     assert r.json()["status"] == "off"
     assert r.json()["currentExperienceId"] == "exp-1"
-    
+
 
 def test_set_display():
     r = client.put("/api/clients/cli-1/display", json={"displayOff": True})
@@ -394,24 +394,66 @@ def test_set_display():
     assert client.put("/api/clients/xxx/display", json={"displayOff": True}).status_code == 404
 
 
-def test_display_states():
-    showing = client.get("/api/clients/cli-1/display")
-    assert showing.status_code == 200
-    assert showing.headers["cache-control"] == "no-store"
-    assert showing.json()["kind"] == "showing"
-    assert showing.json()["experience"]["id"] == "exp-1"
+# ---------- o que a tela exibe ----------
 
-    assert client.get("/api/clients/cli-2/display").json() == {"kind": "off"}
-    assert client.get("/api/clients/cli-4/display").json() == {"kind": "waiting"}
-    r = client.get("/api/clients/xxx/display")
+def display(client_id):
+    return client.get(f"/api/clients/{client_id}/display")
+
+
+def test_display_experience():
+    r = display("cli-1")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "no-store"
+    assert r.json()["kind"] == "experience"
+    assert r.json()["experience"]["id"] == "exp-1"
+
+
+def test_display_image():
+    r = display("cli-3")
+    assert r.json()["kind"] == "image" and r.json()["image"]["id"] == "img-1"
+
+
+def test_display_paused_is_black():
+    assert display("cli-2").json() == {"kind": "paused"}
+
+
+def test_display_standby_without_image_is_black():
+    assert display("cli-4").json() == {"kind": "standby", "image": None}
+
+
+def test_display_standby_uses_global_image():
+    client.put("/api/settings", json={"standbyImageId": "img-1"})
+    r = display("cli-4").json()
+    assert r["kind"] == "standby" and r["image"]["id"] == "img-1"
+
+
+def test_display_toggle_between_image_and_experience():
+    put_content("cli-1", {"imgId": "img-1"})
+    assert display("cli-1").json()["kind"] == "image"
+    put_content("cli-1", {"displayImg": False})
+    assert display("cli-1").json()["kind"] == "experience"
+
+
+def test_display_image_removed_falls_back_to_standby():
+    put_content("cli-3", {"imgId": None})  # o tablet nao tem experiencia
+    assert display("cli-3").json()["kind"] == "standby"
+
+
+def test_display_keeps_inactivated_item_until_changed():
+    client.put("/api/images/img-1/active", json={"active": False})
+    assert display("cli-3").json()["kind"] == "image"  # continua (EC18)
+
+
+def test_display_unknown_screen():
+    r = display("xxx")
     assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
 
 
 def test_display_follows_dashboard_changes():
     put_content("cli-4", {"experienceId": "exp-2"})
-    assert client.get("/api/clients/cli-4/display").json()["experience"]["id"] == "exp-2"
+    assert display("cli-4").json()["experience"]["id"] == "exp-2"
     client.put("/api/clients/cli-4/display", json={"displayOff": True})
-    assert client.get("/api/clients/cli-4/display").json() == {"kind": "off"}
+    assert display("cli-4").json() == {"kind": "paused"}
 
 
 def test_cors_preflight():

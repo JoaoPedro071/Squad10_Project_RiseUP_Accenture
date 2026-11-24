@@ -18,10 +18,11 @@ from models.seed import (
 )
 from schemas.client import Client
 from schemas.display import (
-    DisplayOff,
-    DisplayShowing,
+    DisplayExperience,
+    DisplayImage,
+    DisplayPaused,
+    DisplayStandby,
     DisplayState,
-    DisplayWaiting,
 )
 from schemas.experience import Experience
 from schemas.focus import FocusState
@@ -253,19 +254,27 @@ class InMemoryStore:
 
     # --- o que a tela do monitor deve mostrar agora ---
     def get_display_state(self, client_id: str) -> DisplayState | None:
+        """Prioridade: Em pausa > imagem > experiencia > stand-by.
+
+        Item inativado continua sendo exibido ate ser trocado (EC18): a
+        inativacao so impede novas atribuicoes.
+        """
         client = self.find_client(client_id)
         if client is None:
             return None
-        if client.display_off:
-            return DisplayOff()
-        experience = (
-            self.find_experience(client.current_experience_id)
-            if client.current_experience_id
-            else None
-        )
-        if experience:
-            return DisplayShowing(experience=experience)
-        return DisplayWaiting()
+        if client.display_off:  # provisorio: vira a camada do Modo foco na Etapa 8
+            return DisplayPaused()
+        if client.display_img and client.img_id:
+            image = self.find_image(client.img_id)
+            if image:
+                return DisplayImage(image=image)
+        if client.current_experience_id:
+            experience = self.find_experience(client.current_experience_id)
+            if experience:
+                return DisplayExperience(experience=experience)
+        standby_id = self._settings.standby_image_id
+        standby = self.find_image(standby_id) if standby_id else None
+        return DisplayStandby(image=standby)
 
 
 store = InMemoryStore()

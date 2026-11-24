@@ -1,30 +1,43 @@
+"""O que a tela deve exibir agora (resposta do GET /api/clients/{id}/display).
+
+Prioridade: Em pausa > imagem > experiencia > stand-by.
+Estados locais do player (carregando, falha de conteudo, sem conexao) nao
+vem daqui: o proprio player os mostra.
+"""
+
 from typing import Annotated, Literal, Union
 
 from pydantic import Field
 
 from schemas.base import CamelModel
 from schemas.experience import Experience
+from schemas.image import Image
 
 
-class DisplayWaiting(CamelModel):
-    kind: Literal["waiting"] = "waiting"
+class DisplayPaused(CamelModel):
+    """Modo foco ativo e esta nao e a tela em foco: tela preta."""
+
+    kind: Literal["paused"] = "paused"
 
 
-class DisplayShowing(CamelModel):
-    kind: Literal["showing"] = "showing"
+class DisplayImage(CamelModel):
+    kind: Literal["image"] = "image"
+    image: Image
+
+
+class DisplayExperience(CamelModel):
+    kind: Literal["experience"] = "experience"
     experience: Experience
 
 
-class DisplayOff(CamelModel):
-    kind: Literal["off"] = "off"
+class DisplayStandby(CamelModel):
+    """Sem conteudo atribuido. image = imagem de stand-by global (null = preto)."""
+
+    kind: Literal["standby"] = "standby"
+    image: Image | None = None
 
 
-class DisplayError(CamelModel):
-    kind: Literal["error"] = "error"
-
-
-# Espelha o DisplayState de types/display.ts do front.
 DisplayState = Annotated[
-    Union[DisplayWaiting, DisplayShowing, DisplayOff, DisplayError],
+    Union[DisplayPaused, DisplayImage, DisplayExperience, DisplayStandby],
     Field(discriminator="kind"),
 ]
