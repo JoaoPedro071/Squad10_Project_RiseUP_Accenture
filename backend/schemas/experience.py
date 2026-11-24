@@ -2,7 +2,8 @@ from typing import Any, Literal
 
 from schemas.base import CamelModel
 
-ExperienceType = Literal["web", "image"]
+# Imagens agora tem catalogo proprio (schemas/image.py).
+ExperienceType = Literal["web"]
 ExperienceOrientation = Literal["landscape", "portrait", "any"]
 
 
