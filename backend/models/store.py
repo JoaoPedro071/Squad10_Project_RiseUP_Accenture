@@ -101,7 +101,7 @@ class InMemoryStore:
         )
         if not self.is_alive(client):
             client.status = "off"
-        elif client.display_off:  # provisorio: vira a camada do Modo foco na Etapa 8
+        elif self.is_paused(client):
             client.status = "paused"
         elif client.orientation_mismatch:
             client.status = "error"
@@ -130,8 +130,6 @@ class InMemoryStore:
         self,
         client_id: str,
         *,
-        current_experience_id: str | None = None,
-        display_off: bool | None = None,
         x: float | None = None,
         y: float | None = None,
         locked: bool | None = None,
@@ -139,10 +137,6 @@ class InMemoryStore:
         client = self.find_client(client_id)
         if client is None:
             return None
-        if current_experience_id is not None:
-            client.current_experience_id = current_experience_id
-        if display_off is not None:
-            client.display_off = display_off
         if x is not None:
             client.x = x
         if y is not None:
@@ -167,8 +161,8 @@ class InMemoryStore:
         client.current_experience_id = current_experience_id
         client.img_id = img_id
         client.display_img = display_img
-        # Provisorio (sai na Etapa 8): escolher conteudo religa a tela.
-        client.display_off = False
+        # Durante o Modo foco a tela segue Em pausa: a troca fica guardada
+        # e aparece quando o foco terminar.
         self._refresh_status(client)
         return client
 
@@ -213,9 +207,14 @@ class InMemoryStore:
         self._settings.standby_image_id = image_id
         return self._settings
 
-    # --- Modo foco: uma tela apresenta e as outras ligadas apagam ---
+    # --- Modo foco: camada por cima das atribuicoes ---
     def get_focus(self) -> FocusState | None:
         return self._focus
+
+    def is_paused(self, client: Client) -> bool:
+        """Em pausa = Modo foco ativo e esta nao e a tela em foco.
+        Vale tambem para quem reconecta durante o foco."""
+        return self._focus is not None and client.id != self._focus.client_id
 
     def start_focus(self, client_id: str) -> FocusState | str:
         """Devolve o FocusState ou o codigo do erro: not_found, offline, already_active."""
@@ -226,31 +225,17 @@ class InMemoryStore:
             return "not_found"
         if not self.is_alive(focused):
             return "offline"
-
-        others = [c for c in self.list_clients() if c.id != focused.id]
-        to_darken = [c for c in others if self.is_alive(c) and not c.display_off]
-        offline = [c for c in others if not self.is_alive(c)]
-
-        # So apaga as que estavam ligadas; as ja desligadas continuam como estao.
-        for client in to_darken:
-            client.display_off = True
-
-        self._focus = FocusState(
-            client_id=client_id,
-            affected_ids=[c.id for c in to_darken],
-            offline_ids=[c.id for c in offline],
-        )
+        # Nada e alterado nas telas: a pausa e calculada a partir do foco.
+        self._focus = FocusState(client_id=client_id)
         return self._focus
 
     def end_focus(self) -> bool:
+        """Cada tela volta exatamente ao que tem atribuido."""
         if self._focus is None:
             return False
-        for client_id in self._focus.affected_ids:
-            client = self.find_client(client_id)
-            if client:
-                client.display_off = False
         self._focus = None
         return True
+
 
     # --- o que a tela do monitor deve mostrar agora ---
     def get_display_state(self, client_id: str) -> DisplayState | None:
@@ -262,7 +247,7 @@ class InMemoryStore:
         client = self.find_client(client_id)
         if client is None:
             return None
-        if client.display_off:  # provisorio: vira a camada do Modo foco na Etapa 8
+        if self.is_paused(client):
             return DisplayPaused()
         if client.display_img and client.img_id:
             image = self.find_image(client.img_id)

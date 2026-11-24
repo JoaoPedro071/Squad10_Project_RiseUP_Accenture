@@ -45,8 +45,8 @@ def seed_clients() -> list[Client]:
                current_experience_id="exp-1",
                reported_orientation="landscape", reported_resolution="1920x1080",
                x=25, y=30, locked=True),
+        # Ligada e sem conteudo: exibe o stand-by.
         Client(id="cli-2", name="TV Sala de Reunião",
-               display_off=True,
                reported_orientation="landscape", reported_resolution="3840x2160",
                x=75, y=30, locked=True),
         Client(id="cli-3", name="Tablet Recepção",

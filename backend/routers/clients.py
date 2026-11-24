@@ -8,7 +8,6 @@ from models.store import store
 from schemas.client import (
     Client,
     ContentUpdate,
-    DisplayUpdate,
     HeartbeatUpdate,
     LockUpdate,
     PositionUpdate,
@@ -63,16 +62,6 @@ async def heartbeat(client_id: str, payload: HeartbeatUpdate):
     if store.record_heartbeat(client_id, payload.orientation, resolution) is None:
         raise ApiError(404, "Tela não encontrada")
     return Response(status_code=204)
-
-
-@router.put("/{client_id}/display", response_model=Client)
-async def set_display(client_id: str, payload: DisplayUpdate):
-    if not isinstance(payload.display_off, bool):
-        raise ApiError(422, "Campo displayOff inválido")
-    client = store.update_client(client_id, display_off=payload.display_off)
-    if client is None:
-        raise ApiError(404, "Tela não encontrada")
-    return client
 
 
 @router.put("/{client_id}/content", response_model=Client)

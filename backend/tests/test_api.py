@@ -35,7 +35,7 @@ def test_list_clients_camel_case():
     assert r.status_code == 200
     assert set(r.json()[0]) == {
         "id", "name", "status", "orientationMismatch",
-        "currentExperienceId", "imgId", "displayImg", "displayOff",
+        "currentExperienceId", "imgId", "displayImg",
         "reportedOrientation", "reportedResolution", "lastSeenAt",
         "x", "y", "locked",
     }
@@ -246,12 +246,6 @@ def test_content_unknown_client():
     assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
 
 
-def test_content_turns_display_on_provisional():
-    # Comportamento antigo mantido ate a Etapa 8 (Modo foco como camada).
-    r = put_content("cli-2", {"experienceId": "exp-3"})
-    assert r.json()["displayOff"] is False
-
-
 # ---------- sinal de vida ----------
 
 def heartbeat(client_id, body):
@@ -330,7 +324,7 @@ def test_focus_rejects_screen_that_stopped_responding():
 def test_seed_statuses():
     tela = screens()
     assert tela["cli-1"]["status"] == "busy"     # exibe experiencia
-    assert tela["cli-2"]["status"] == "paused"   # escurecida (provisorio: displayOff)
+    assert tela["cli-2"]["status"] == "standby"  # ligada, sem conteudo
     assert tela["cli-3"]["status"] == "busy"     # exibe imagem
     assert tela["cli-4"]["status"] == "off"      # nunca deu sinal
 
@@ -363,10 +357,9 @@ def test_standby_never_flags_orientation():
 
 
 def test_paused_wins_over_error():
-    heartbeat("cli-2", {"orientation": "portrait"})
-    put_content("cli-2", {"experienceId": "exp-1"})      # religa (provisorio)
-    client.put("/api/clients/cli-2/display", json={"displayOff": True})
-    tela = screens()["cli-2"]
+    heartbeat("cli-1", {"orientation": "portrait"})  # erro de orientacao
+    client.post("/api/focus", json={"clientId": "cli-3"})
+    tela = screens()["cli-1"]
     assert tela["orientationMismatch"] is True and tela["status"] == "paused"
 
 
@@ -385,13 +378,6 @@ def test_content_on_offline_screen_reports_off():
     assert r.status_code == 200
     assert r.json()["status"] == "off"
     assert r.json()["currentExperienceId"] == "exp-1"
-
-
-def test_set_display():
-    r = client.put("/api/clients/cli-1/display", json={"displayOff": True})
-    assert r.status_code == 200 and r.json()["displayOff"] is True
-    assert client.put("/api/clients/cli-1/display", json={"displayOff": "sim"}).status_code == 422
-    assert client.put("/api/clients/xxx/display", json={"displayOff": True}).status_code == 404
 
 
 # ---------- o que a tela exibe ----------
@@ -414,7 +400,8 @@ def test_display_image():
 
 
 def test_display_paused_is_black():
-    assert display("cli-2").json() == {"kind": "paused"}
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    assert display("cli-3").json() == {"kind": "paused"}
 
 
 def test_display_standby_without_image_is_black():
@@ -452,7 +439,7 @@ def test_display_unknown_screen():
 def test_display_follows_dashboard_changes():
     put_content("cli-4", {"experienceId": "exp-2"})
     assert display("cli-4").json()["experience"]["id"] == "exp-2"
-    client.put("/api/clients/cli-4/display", json={"displayOff": True})
+    client.post("/api/focus", json={"clientId": "cli-1"})
     assert display("cli-4").json() == {"kind": "paused"}
 
 
@@ -517,17 +504,28 @@ def test_focus_initial_state():
     assert len(body["clients"]) == 4
 
 
-def test_focus_start_darkens_only_online_and_on():
+def test_focus_pauses_every_other_screen():
     r = client.post("/api/focus", json={"clientId": "cli-1"})
     assert r.status_code == 201
     body = r.json()
-    assert body["focus"] == {
-        "clientId": "cli-1", "affectedIds": ["cli-3"], "offlineIds": ["cli-4"]
-    }
-    by_id = {c["id"]: c for c in body["clients"]}
-    assert by_id["cli-3"]["displayOff"] is True    # estava ligada, apagou
-    assert by_id["cli-2"]["displayOff"] is True    # ja estava apagada
-    assert by_id["cli-1"]["displayOff"] is False   # a que apresenta
+    assert body["focus"] == {"clientId": "cli-1"}
+    status = {c["id"]: c["status"] for c in body["clients"]}
+    assert status["cli-1"] == "busy"     # a que apresenta segue exibindo
+    assert status["cli-2"] == "paused"
+    assert status["cli-3"] == "paused"
+    assert status["cli-4"] == "off"      # desligada continua desligada
+    assert display("cli-1").json()["kind"] == "experience"
+
+
+def test_focus_does_not_touch_assignments():
+    before = screens()
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    client.delete("/api/focus")
+    after = screens()
+    for cid in before:
+        for field in ("currentExperienceId", "imgId", "displayImg"):
+            assert after[cid][field] == before[cid][field]
+        assert after[cid]["status"] == before[cid]["status"]
 
 
 def test_focus_errors():
@@ -540,15 +538,28 @@ def test_focus_errors():
     assert again.json() == {"error": "O Modo foco já está ativo"}
 
 
-def test_focus_end_restores_only_affected():
+def test_content_changed_during_focus_appears_after():
     client.post("/api/focus", json={"clientId": "cli-1"})
-    r = client.delete("/api/focus")
+    r = put_content("cli-3", {"experienceId": "exp-2"})
     assert r.status_code == 200
-    body = r.json()
-    assert body["focus"] is None
-    by_id = {c["id"]: c for c in body["clients"]}
-    assert by_id["cli-3"]["displayOff"] is False   # voltou
-    assert by_id["cli-2"]["displayOff"] is True    # continua como estava
+    assert r.json()["status"] == "paused"               # segue pausada
+    assert display("cli-3").json() == {"kind": "paused"}
+    client.delete("/api/focus")
+    shown = display("cli-3").json()
+    assert shown["kind"] == "experience" and shown["experience"]["id"] == "exp-2"
+
+
+def test_screen_reconnecting_during_focus_comes_back_paused():
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    heartbeat("cli-4", {"orientation": "landscape"})   # estava desligada
+    assert screens()["cli-4"]["status"] == "paused"
+    assert display("cli-4").json() == {"kind": "paused"}
+
+
+def test_focused_screen_can_change_content():
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    put_content("cli-1", {"experienceId": "exp-3"})
+    assert display("cli-1").json()["experience"]["id"] == "exp-3"
 
 
 def test_focus_end_without_active_is_ok():

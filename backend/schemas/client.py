@@ -17,7 +17,7 @@ ScreenStatus = Literal["busy", "standby", "paused", "error", "off"]
 class Client(CamelModel):
     id: str
     name: str
-    
+
     # Calculados pelo backend a cada consulta (ver ScreenStatus acima).
     status: ScreenStatus = "off"
     # true = a orientacao da tela nao combina com o que ela esta exibindo
@@ -28,8 +28,6 @@ class Client(CamelModel):
     current_experience_id: str | None = None
     img_id: str | None = None
     display_img: bool = False  # true = exibe a imagem (img_id) no lugar da experiencia
-    # Provisorio: sai na Etapa 8, quando o Modo foco vira uma camada.
-    display_off: bool = False
 
     # --- informado pela propria tela (sinal de vida, Etapa 5) ---
     reported_orientation: ScreenOrientation | None = None
@@ -51,10 +49,6 @@ class ContentUpdate(CamelModel):
     experience_id: Any = None
     img_id: Any = None
     display_img: Any = None
-
-
-class DisplayUpdate(CamelModel):
-    display_off: Any = None
 
 
 class HeartbeatUpdate(CamelModel):
