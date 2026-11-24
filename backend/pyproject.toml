@@ -1,0 +1,24 @@
+[project]
+name = "experience-manager-api"
+version = "0.1.0"
+description = "API do Experience Manager (Innovation Center Accenture, Squad 10)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "httpx2>=2.0",
+]
+
+[tool.uv]
+# Aplicacao (nao biblioteca): o uv so instala as dependencias, nao empacota o projeto.
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

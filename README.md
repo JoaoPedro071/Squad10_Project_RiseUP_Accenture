@@ -29,15 +29,15 @@ frontend/client-app/   player exibido em cada tela (Next.js, porta 3001)
 
 ## Como rodar
 
-### Back-end (Python 3.10 ou superior)
+### Back-end (uv)
+
+Instale o [uv](https://docs.astral.sh/uv/) uma vez; ele cuida do Python (3.12) e das dependências.
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt
-uvicorn main:app --reload --port 8000
-pytest                           # 70 testes
+uv sync
+uv run uvicorn main:app --reload --port 8000
+uv run pytest                    # 70 testes
 ```
 
 Documentação interativa da API: http://localhost:8000/docs
