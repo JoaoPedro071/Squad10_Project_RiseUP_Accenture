@@ -30,8 +30,15 @@ class Client(CamelModel):
     locked: bool = False  # true = posição travada
 
 
-class AssignmentUpdate(CamelModel):
+class ContentUpdate(CamelModel):
+    """Corpo do PUT /api/clients/{id}/content.
+
+    Todos os campos sao opcionais e so os ENVIADOS mudam. Enviar null remove.
+    """
+
     experience_id: Any = None
+    img_id: Any = None
+    display_img: Any = None
 
 
 class DisplayUpdate(CamelModel):

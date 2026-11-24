@@ -78,6 +78,26 @@ class InMemoryStore:
             client.locked = locked
         return client
 
+    def set_content(
+        self,
+        client_id: str,
+        *,
+        current_experience_id: str | None,
+        img_id: str | None,
+        display_img: bool,
+    ) -> Client | None:
+        """Grava o conteudo da tela. Diferente de update_client, aqui None
+        significa "remover", entao da para deixar a tela sem conteudo."""
+        client = self.find_client(client_id)
+        if client is None:
+            return None
+        client.current_experience_id = current_experience_id
+        client.img_id = img_id
+        client.display_img = display_img
+        # Provisorio (sai na Etapa 8): escolher conteudo religa a tela.
+        client.display_off = False
+        return client
+
     def create_experience(self, data: dict) -> Experience:
         experience = Experience(
             id=f"exp-{int(time.time() * 1000)}",

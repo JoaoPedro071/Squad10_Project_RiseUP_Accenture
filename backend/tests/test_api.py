@@ -177,26 +177,78 @@ def test_cannot_inactivate_current_standby_image():
     assert r.json() == {"error": "Esta imagem é o stand-by atual. Escolha outro stand-by antes."}
     assert client.get("/api/images").json()[0]["active"] is True
 
-def test_assignment_ok_turns_display_on():
-    r = client.put("/api/clients/cli-2/assignment", json={"experienceId": "exp-3"})
+# ---------- conteudo da tela (experiencia, imagem ou nada) ----------
+
+def put_content(client_id, body):
+    return client.put(f"/api/clients/{client_id}/content", json=body)
+
+
+def test_content_choose_experience():
+    # O tablet exibe a imagem img-1; escolher uma experiencia passa a exibi-la.
+    r = put_content("cli-3", {"experienceId": "exp-2"})
     assert r.status_code == 200
     body = r.json()
-    assert body["currentExperienceId"] == "exp-3"
-    assert body["displayOff"] is False
+    assert body["currentExperienceId"] == "exp-2"
+    assert body["displayImg"] is False
+    assert body["imgId"] == "img-1"  # a imagem fica guardada
 
 
-def test_assignment_inactive_or_unknown_experience():
-    for exp in ("exp-5", "nao-existe"):
-        r = client.put("/api/clients/cli-1/assignment", json={"experienceId": exp})
-        assert r.status_code == 422
-        assert r.json() == {"error": "Experiência indisponível"}
+def test_content_choose_image_and_toggle_back():
+    r = put_content("cli-1", {"imgId": "img-1"})
+    assert r.status_code == 200
+    assert r.json()["displayImg"] is True
+    assert r.json()["currentExperienceId"] == "exp-1"  # a experiencia fica guardada
+    r = put_content("cli-1", {"displayImg": False})
+    assert r.json()["displayImg"] is False and r.json()["imgId"] == "img-1"
 
 
-def test_assignment_unknown_client():
-    r = client.put("/api/clients/xxx/assignment", json={"experienceId": "exp-1"})
-    assert r.status_code == 404
-    assert r.json() == {"error": "Tela não encontrada"}
+def test_content_remove_experience():
+    # Antes nao havia como deixar uma tela sem experiencia.
+    r = put_content("cli-1", {"experienceId": None})
+    assert r.status_code == 200
+    assert r.json()["currentExperienceId"] is None
 
+
+def test_content_remove_image_stops_showing_it():
+    r = put_content("cli-3", {"imgId": None})
+    assert r.status_code == 200
+    assert r.json()["imgId"] is None and r.json()["displayImg"] is False
+
+
+def test_content_display_img_requires_image():
+    r = put_content("cli-1", {"displayImg": True})
+    assert r.status_code == 422
+    assert r.json() == {"error": "Escolha uma imagem antes de exibi-la"}
+
+
+def test_content_rejects_unavailable_items():
+    for value in ("exp-5", "nao-existe", 123):
+        r = put_content("cli-1", {"experienceId": value})
+        assert r.status_code == 422 and r.json() == {"error": "Experiência indisponível"}
+    r = put_content("cli-1", {"imgId": "nao-existe"})
+    assert r.status_code == 422 and r.json() == {"error": "Imagem indisponível"}
+    r = put_content("cli-1", {"displayImg": "sim"})
+    assert r.status_code == 422 and r.json() == {"error": "Campo displayImg inválido"}
+    r = put_content("cli-1", {})
+    assert r.status_code == 422 and r.json() == {"error": "Nada para alterar"}
+
+
+def test_content_is_all_or_nothing():
+    r = put_content("cli-1", {"experienceId": "exp-2", "imgId": "nao-existe"})
+    assert r.status_code == 422
+    tela = {c["id"]: c for c in client.get("/api/clients").json()}["cli-1"]
+    assert tela["currentExperienceId"] == "exp-1"  # nada mudou
+
+
+def test_content_unknown_client():
+    r = put_content("xxx", {"experienceId": "exp-1"})
+    assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
+
+
+def test_content_turns_display_on_provisional():
+    # Comportamento antigo mantido ate a Etapa 8 (Modo foco como camada).
+    r = put_content("cli-2", {"experienceId": "exp-3"})
+    assert r.json()["displayOff"] is False
 
 def test_set_display():
     r = client.put("/api/clients/cli-1/display", json={"displayOff": True})
@@ -219,7 +271,7 @@ def test_display_states():
 
 
 def test_display_follows_dashboard_changes():
-    client.put("/api/clients/cli-4/assignment", json={"experienceId": "exp-2"})
+    put_content("cli-4", {"experienceId": "exp-2"})
     assert client.get("/api/clients/cli-4/display").json()["experience"]["id"] == "exp-2"
     client.put("/api/clients/cli-4/display", json={"displayOff": True})
     assert client.get("/api/clients/cli-4/display").json() == {"kind": "off"}
@@ -227,7 +279,7 @@ def test_display_follows_dashboard_changes():
 
 def test_cors_preflight():
     r = client.options(
-        "/api/clients/cli-1/assignment",
+        "/api/clients/cli-1/content",
         headers={"Origin": "http://localhost:3000",
                  "Access-Control-Request-Method": "PUT",
                  "Access-Control-Request-Headers": "content-type"},

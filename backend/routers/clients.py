@@ -5,8 +5,8 @@ from fastapi import APIRouter, Response
 from errors import ApiError
 from models.store import store
 from schemas.client import (
-    AssignmentUpdate,
     Client,
+    ContentUpdate,
     DisplayUpdate,
     LockUpdate,
     PositionUpdate,
@@ -53,18 +53,66 @@ async def set_display(client_id: str, payload: DisplayUpdate):
     return client
 
 
-@router.put("/{client_id}/assignment", response_model=Client)
-async def assign_experience(client_id: str, payload: AssignmentUpdate):
-    experience = store.find_experience(str(payload.experience_id or ""))
-    if experience is None or not experience.active:
-        raise ApiError(422, "Experiência indisponível")
-    # Atribuir uma experiencia tambem religa a tela (igual ao front).
-    client = store.update_client(
-        client_id, current_experience_id=experience.id, display_off=False
-    )
+@router.put("/{client_id}/content", response_model=Client)
+async def set_content(client_id: str, payload: ContentUpdate):
+    """Define o que a tela exibe: experiencia, imagem ou nada.
+
+    So os campos enviados mudam. Regras:
+    - experienceId (id ou null): escolher uma experiencia passa a exibi-la.
+    - imgId (id ou null): escolher uma imagem passa a exibi-la; remover a
+      imagem volta para a experiencia (ou stand-by).
+    - displayImg (true/false): alterna entre a imagem e a experiencia sem
+      perder nenhuma das duas.
+    Tudo e validado antes de gravar: ou muda tudo, ou nada muda.
+    """
+    sent = payload.model_fields_set
+    if not sent:
+        raise ApiError(422, "Nada para alterar")
+    client = store.find_client(client_id)
     if client is None:
         raise ApiError(404, "Tela não encontrada")
-    return client
+
+    # Parte do que a tela tem hoje e aplica so o que foi enviado.
+    experience_id = client.current_experience_id
+    img_id = client.img_id
+    display_img = client.display_img
+
+    if "experience_id" in sent:
+        experience_id = payload.experience_id
+        if experience_id is not None:
+            experience = (
+                store.find_experience(experience_id)
+                if isinstance(experience_id, str)
+                else None
+            )
+            if experience is None or not experience.active:
+                raise ApiError(422, "Experiência indisponível")
+            display_img = False
+
+    if "img_id" in sent:
+        img_id = payload.img_id
+        if img_id is not None:
+            image = store.find_image(img_id) if isinstance(img_id, str) else None
+            if image is None or not image.active:
+                raise ApiError(422, "Imagem indisponível")
+            display_img = True
+        else:
+            display_img = False
+
+    if "display_img" in sent:
+        if not isinstance(payload.display_img, bool):
+            raise ApiError(422, "Campo displayImg inválido")
+        display_img = payload.display_img
+
+    if display_img and img_id is None:
+        raise ApiError(422, "Escolha uma imagem antes de exibi-la")
+
+    return store.set_content(
+        client_id,
+        current_experience_id=experience_id,
+        img_id=img_id,
+        display_img=display_img,
+    )
 
 
 @router.put("/{client_id}/position", response_model=Client)
