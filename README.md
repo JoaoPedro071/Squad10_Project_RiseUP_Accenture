@@ -64,8 +64,11 @@ Enquanto a integração não é concluída, o dashboard usa rotas simuladas inte
 |---|---|
 | `GET /api/experiences` | lista o catálogo |
 | `POST /api/experiences` | cria uma experiência (com validação) |
+| `GET/POST /api/images` | lista e cadastra imagens |
+| `PUT /api/images/{id}/active` | ativa ou inativa uma imagem |
+| `GET/PUT /api/settings` | consulta e escolhe a imagem de stand-by |
 | `GET /api/clients` | lista as telas |
-| `PUT /api/clients/{id}/assignment` | atribui uma experiência a uma tela |
+| `PUT /api/clients/{id}/content` | define o que a tela exibe: experiência, imagem ou nada |
 | `PUT /api/clients/{id}/display` | liga ou desliga a tela |
 | `GET /api/clients/{id}/display` | o que o player deve exibir agora |
 | `PUT /api/clients/{id}/position` | move a tela na planta |
@@ -78,6 +81,7 @@ Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
 
 - [x] Dashboard com planta, trava de posição e Modo foco (com API simulada)
 - [x] Back-end, fatia 1: contrato do front e 24 testes
+- [x] Back-end: novo modelo de tela, catálogo de imagens, stand-by global e atribuição de conteúdo (43 testes)
 - [ ] Integração entre front-end e back-end
 - [ ] Persistência em banco de dados
 - [ ] Tempo real com WebSocket
