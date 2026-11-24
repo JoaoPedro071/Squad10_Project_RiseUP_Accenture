@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ExperienceDisplay from "@/components/ExperienceDisplay";
 import StatusScreen from "@/components/StatusScreen";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
 import { API_URL } from "@/lib/config";
 import type { DisplayState } from "@/types/api";
 
@@ -20,6 +21,8 @@ export default function DisplayController() {
   const [connection, setConnection] = useState<Connection>({
     kind: "connecting",
   });
+
+  useHeartbeat(clientId);
 
   useEffect(() => {
     if (!clientId) return;
