@@ -1,3 +1,4 @@
+from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
@@ -249,6 +250,80 @@ def test_content_turns_display_on_provisional():
     # Comportamento antigo mantido ate a Etapa 8 (Modo foco como camada).
     r = put_content("cli-2", {"experienceId": "exp-3"})
     assert r.json()["displayOff"] is False
+
+
+# ---------- sinal de vida ----------
+
+def heartbeat(client_id, body):
+    return client.post(f"/api/clients/{client_id}/heartbeat", json=body)
+
+
+def screens():
+    return {c["id"]: c for c in client.get("/api/clients").json()}
+
+
+def advance_clock(seconds):
+    """Simula o tempo passando, sem precisar esperar de verdade."""
+    current = store._clock()
+    store._clock = lambda: current + timedelta(seconds=seconds)
+
+
+def test_seed_status_comes_from_last_seen():
+    tela = screens()
+    assert tela["cli-1"]["status"] == "online" and tela["cli-1"]["lastSeenAt"] is not None
+    assert tela["cli-4"]["status"] == "offline" and tela["cli-4"]["lastSeenAt"] is None
+
+
+def test_heartbeat_brings_screen_online_and_records_info():
+    r = heartbeat("cli-4", {"orientation": "portrait", "resolution": "1080x1920"})
+    assert r.status_code == 204
+    tela = screens()["cli-4"]
+    assert tela["status"] == "online"
+    assert tela["reportedOrientation"] == "portrait"
+    assert tela["reportedResolution"] == "1080x1920"
+    assert tela["lastSeenAt"] is not None
+
+
+def test_heartbeat_resolution_is_optional():
+    r = heartbeat("cli-1", {"orientation": "portrait"})
+    assert r.status_code == 204
+    tela = screens()["cli-1"]
+    assert tela["reportedOrientation"] == "portrait"
+    assert tela["reportedResolution"] == "1920x1080"  # mantem a anterior
+
+
+def test_screen_goes_offline_after_timeout_and_keeps_content():
+    advance_clock(16)  # passou do limite de 15 s sem sinal
+    tela = screens()["cli-1"]
+    assert tela["status"] == "offline"
+    assert tela["currentExperienceId"] == "exp-1"  # a atribuicao fica guardada
+    heartbeat("cli-1", {"orientation": "landscape"})
+    tela = screens()["cli-1"]
+    assert tela["status"] == "online"
+    assert tela["currentExperienceId"] == "exp-1"  # volta exibindo o mesmo
+
+
+def test_screen_still_online_within_timeout():
+    advance_clock(10)
+    assert screens()["cli-1"]["status"] == "online"
+
+
+def test_heartbeat_errors():
+    for body in ({}, {"orientation": "deitada"}, {"orientation": 1}):
+        r = heartbeat("cli-1", body)
+        assert r.status_code == 422 and r.json() == {"error": "Orientação inválida"}
+    for res in ("grande", "1920 x 1080", 1920):
+        r = heartbeat("cli-1", {"orientation": "landscape", "resolution": res})
+        assert r.status_code == 422 and r.json() == {"error": "Resolução inválida"}
+    r = heartbeat("xxx", {"orientation": "landscape"})
+    assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
+
+
+def test_focus_rejects_screen_that_stopped_responding():
+    advance_clock(16)
+    r = client.post("/api/focus", json={"clientId": "cli-1"})
+    assert r.status_code == 422 and r.json() == {"error": "A tela está offline"}
+
 
 def test_set_display():
     r = client.put("/api/clients/cli-1/display", json={"displayOff": True})

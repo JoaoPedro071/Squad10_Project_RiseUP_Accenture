@@ -7,7 +7,9 @@ nao precisam mudar. Como o estado vive no processo, rode com UM worker.
 
 import time
 import uuid
+from datetime import datetime, timedelta, timezone
 
+from config import HEARTBEAT_TIMEOUT_SECONDS
 from models.seed import seed_clients, seed_experiences, seed_images
 from schemas.client import Client
 from schemas.display import (
@@ -27,11 +29,18 @@ class InMemoryStore:
         self.reset()
 
     def reset(self) -> None:
+        # Relogio substituivel nos testes (para simular o tempo passando).
+        self._clock = lambda: datetime.now(timezone.utc)
         self._experiences = seed_experiences()
         self._images = seed_images()
         self._clients = seed_clients()
         self._focus: FocusState | None = None
         self._settings = Settings()
+        # As telas do seed marcadas como online "acabaram de dar sinal".
+        # Sem o player rodando, elas ficam desligadas apos o tempo limite.
+        for client in self._clients:
+            if client.status == "online":
+                client.last_seen_at = self._clock()
 
     # --- leitura ---
     def list_experiences(self) -> list[Experience]:
@@ -41,6 +50,8 @@ class InMemoryStore:
         return list(self._images)
 
     def list_clients(self) -> list[Client]:
+        for client in self._clients:
+            self._refresh_status(client)
         return list(self._clients)
 
     def find_experience(self, experience_id: str) -> Experience | None:
@@ -50,7 +61,33 @@ class InMemoryStore:
         return next((i for i in self._images if i.id == image_id), None)
 
     def find_client(self, client_id: str) -> Client | None:
-        return next((c for c in self._clients if c.id == client_id), None)
+        client = next((c for c in self._clients if c.id == client_id), None)
+        if client is not None:
+            self._refresh_status(client)
+        return client
+
+    # --- sinal de vida ---
+    def _refresh_status(self, client: Client) -> None:
+        """online = deu sinal de vida dentro do tempo limite."""
+        limit = timedelta(seconds=HEARTBEAT_TIMEOUT_SECONDS)
+        seen = client.last_seen_at
+        alive = seen is not None and self._clock() - seen <= limit
+        client.status = "online" if alive else "offline"
+
+    def record_heartbeat(
+        self, client_id: str, orientation: str, resolution: str | None
+    ) -> Client | None:
+        """A tela avisou que esta viva. Atualiza o que ela informou.
+        A atribuicao de conteudo nao muda: ao voltar, a tela exibe o mesmo."""
+        client = next((c for c in self._clients if c.id == client_id), None)
+        if client is None:
+            return None
+        client.last_seen_at = self._clock()
+        client.reported_orientation = orientation
+        if resolution is not None:
+            client.reported_resolution = resolution
+        self._refresh_status(client)
+        return client
 
     # --- escrita ---
     def update_client(
@@ -153,7 +190,7 @@ class InMemoryStore:
         if focused.status == "offline":
             return "offline"
 
-        others = [c for c in self._clients if c.id != focused.id]
+        others = [c for c in self.list_clients() if c.id != focused.id]
         to_darken = [c for c in others if c.status == "online" and not c.display_off]
         offline = [c for c in others if c.status == "offline"]
 

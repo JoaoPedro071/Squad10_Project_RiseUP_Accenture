@@ -9,8 +9,9 @@ ScreenOrientation = Literal["landscape", "portrait"]
 class Client(CamelModel):
     id: str
     name: str
-    # Provisorio: vira status derivado (5 estados) na Etapa 6.
-    status: Literal["online", "offline"]
+    # Calculado pelo backend a partir de last_seen_at (sinal de vida).
+    # Provisorio: vira o status de 5 estados na Etapa 6.
+    status: Literal["online", "offline"] = "offline"
 
     # --- o que a tela deve exibir ---
     current_experience_id: str | None = None
@@ -43,6 +44,13 @@ class ContentUpdate(CamelModel):
 
 class DisplayUpdate(CamelModel):
     display_off: Any = None
+
+
+class HeartbeatUpdate(CamelModel):
+    """Corpo do POST /api/clients/{id}/heartbeat, enviado pela propria tela."""
+
+    orientation: Any = None
+    resolution: Any = None  # opcional, ex.: "1920x1080"
 
 
 class PositionUpdate(CamelModel):

@@ -1,4 +1,5 @@
 import math
+import re
 
 from fastapi import APIRouter, Response
 
@@ -8,6 +9,7 @@ from schemas.client import (
     Client,
     ContentUpdate,
     DisplayUpdate,
+    HeartbeatUpdate,
     LockUpdate,
     PositionUpdate,
 )
@@ -16,6 +18,7 @@ from schemas.display import DisplayState
 router = APIRouter(prefix="/api/clients", tags=["clients"])
 
 NO_STORE = {"Cache-Control": "no-store"}
+RESOLUTION = re.compile(r"^\d{2,5}x\d{2,5}$")  # ex.: 1920x1080
 
 
 def _is_percent(value: object) -> bool:
@@ -41,6 +44,25 @@ async def get_display(client_id: str, response: Response):
         raise ApiError(404, "Tela não encontrada", headers=NO_STORE)
     response.headers["Cache-Control"] = "no-store"
     return state
+
+
+@router.post("/{client_id}/heartbeat", status_code=204)
+async def heartbeat(client_id: str, payload: HeartbeatUpdate):
+    """Sinal de vida enviado pela propria tela a cada ~5 s.
+
+    Informa a orientacao atual da maquina (obrigatoria) e a resolucao
+    (opcional). Quem para de enviar passa a ser considerada desligada.
+    """
+    if payload.orientation not in ("landscape", "portrait"):
+        raise ApiError(422, "Orientação inválida")
+    resolution = payload.resolution
+    if resolution is not None and (
+        not isinstance(resolution, str) or not RESOLUTION.match(resolution)
+    ):
+        raise ApiError(422, "Resolução inválida")
+    if store.record_heartbeat(client_id, payload.orientation, resolution) is None:
+        raise ApiError(404, "Tela não encontrada")
+    return Response(status_code=204)
 
 
 @router.put("/{client_id}/display", response_model=Client)
