@@ -10,8 +10,8 @@ app = FastAPI(title="Experience Manager API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type"],
 )
 register_error_handlers(app)
 

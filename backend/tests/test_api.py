@@ -2,6 +2,7 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from config import load_cors_origins
 from main import app
 from models.store import store
 
@@ -443,15 +444,43 @@ def test_display_follows_dashboard_changes():
     assert display("cli-4").json() == {"kind": "paused"}
 
 
-def test_cors_preflight():
-    r = client.options(
+# ---------- CORS ----------
+
+def preflight(origin):
+    return client.options(
         "/api/clients/cli-1/content",
-        headers={"Origin": "http://localhost:3000",
+        headers={"Origin": origin,
                  "Access-Control-Request-Method": "PUT",
                  "Access-Control-Request-Headers": "content-type"},
     )
-    assert r.status_code == 200
-    assert r.headers["access-control-allow-origin"] in ("*", "http://localhost:3000")
+
+
+def test_cors_allows_dashboard_and_player():
+    for origin in ("http://localhost:3000", "http://localhost:3001"):
+        r = preflight(origin)
+        assert r.status_code == 200, origin
+        assert r.headers["access-control-allow-origin"] == origin
+
+
+def test_cors_blocks_unknown_site():
+    r = preflight("http://site-qualquer.com")
+    assert r.status_code == 400
+    assert "access-control-allow-origin" not in r.headers
+
+
+def test_cors_config_defaults_and_parsing():
+    padrao = ["http://localhost:3000", "http://localhost:3001"]
+    assert load_cors_origins(None, "development") == padrao
+    assert load_cors_origins("   ", "development") == padrao
+    assert load_cors_origins(" https://a.com , https://b.com ,", "production") == [
+        "https://a.com", "https://b.com"
+    ]
+
+
+def test_cors_wildcard_only_outside_production():
+    assert load_cors_origins("*", "development") == ["*"]
+    with pytest.raises(RuntimeError):
+        load_cors_origins("*", "production")
 
 
 def test_health():
