@@ -38,3 +38,8 @@ CORS_ORIGINS: list[str] = load_cors_origins(os.getenv("CORS_ORIGINS"), APP_ENV)
 # Sinal de vida: a tela avisa a cada ~5 s. Sem aviso por mais que este tempo,
 # ela passa a ser considerada desligada (3 avisos perdidos).
 HEARTBEAT_TIMEOUT_SECONDS: float = float(os.getenv("HEARTBEAT_TIMEOUT_SECONDS", "15"))
+
+
+# Banco de dados. Padrao: arquivo SQLite na pasta backend (criado sozinho).
+# Para Postgres no futuro, basta trocar a URL.
+DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./experience-manager.db")
