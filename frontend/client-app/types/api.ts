@@ -30,8 +30,7 @@ export type DisplayState =
   | { kind: "experience"; experience: Experience }
   | { kind: "standby"; image: Image | null };
 
-/** Corpo do POST /api/clients/{id}/heartbeat. */
-export type Heartbeat = {
-  orientation: Orientation;
-  resolution?: string; // ex.: "1920x1080"
-};
+/** Mensagens que o backend envia pelo WebSocket da tela. */
+export type ServerMessage =
+  | { type: "display"; version: number; state: DisplayState }
+  | { type: "identify"; number: number; name: string; seconds: number };

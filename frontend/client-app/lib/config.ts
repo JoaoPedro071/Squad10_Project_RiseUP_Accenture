@@ -3,3 +3,6 @@
 
 /** Backend FastAPI. */
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+/** Mesmo backend, pelo WebSocket (http -> ws, https -> wss). */
+export const WS_URL = API_URL.replace(/^http/, "ws");
