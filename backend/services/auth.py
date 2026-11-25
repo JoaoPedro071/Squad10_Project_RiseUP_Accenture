@@ -8,6 +8,7 @@
 import hashlib
 import re
 import secrets
+import time
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
@@ -57,3 +58,37 @@ def validate_new_user(email: str, name: str, password: str, role: str) -> list[s
     if role not in ROLES:
         problems.append("Perfil inválido: use coordination ou support.")
     return problems
+
+
+class LoginLimiter:
+    """Limita tentativas de login erradas: depois de MAX_FAILURES em WINDOW_SECONDS
+    para o mesmo e-mail e endereco, recusa novas tentativas ate a janela passar."""
+
+    MAX_FAILURES = 5
+    WINDOW_SECONDS = 60
+
+    def __init__(self) -> None:
+        self.clock = time.monotonic  # substituivel nos testes
+        self._failures: dict[str, list[float]] = {}
+
+    def _recent(self, key: str) -> list[float]:
+        now = self.clock()
+        recent = [t for t in self._failures.get(key, []) if now - t < self.WINDOW_SECONDS]
+        self._failures[key] = recent
+        return recent
+
+    def blocked(self, key: str) -> bool:
+        return len(self._recent(key)) >= self.MAX_FAILURES
+
+    def fail(self, key: str) -> None:
+        self._recent(key).append(self.clock())
+
+    def clear(self, key: str) -> None:
+        self._failures.pop(key, None)
+
+    def reset(self) -> None:
+        self.clock = time.monotonic
+        self._failures = {}
+
+
+login_limiter = LoginLimiter()
