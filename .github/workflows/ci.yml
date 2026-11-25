@@ -1,0 +1,58 @@
+# Roda os testes do backend e o lint + build dos dois apps do front
+# a cada pull request e a cada push na main.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Um novo push no mesmo PR cancela a execucao anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      # --locked: falha se o uv.lock estiver desatualizado em relacao ao pyproject.toml
+      - name: Instalar dependências
+        run: uv sync --locked
+      - name: Testes
+        run: uv run pytest
+
+  frontend:
+    name: Front (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [dashboard, client-app]
+    defaults:
+      run:
+        working-directory: frontend/${{ matrix.app }}
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/${{ matrix.app }}/package-lock.json
+      - name: Instalar dependências
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
