@@ -60,6 +60,12 @@ export type FocusResponse = { focus: FocusState | null; clients: Client[] };
 
 export type Settings = { standbyImageId: string | null };
 
+/** Mensagens que o backend envia pelo WebSocket do dashboard. */
+export type DashboardMessage =
+  | { type: "state"; focus: FocusState | null; clients: Client[] }
+  | { type: "ack"; clientId: string; version: number } // a tela confirmou a mudança
+  | { type: "identify"; numbers: Record<string, number>; seconds: number };
+
 /** Erros da API: cadastro (400) ou demais (4xx). */
 export type FieldErrors = Record<string, string>;
 export type ApiErrorBody = { error: string } | { fieldErrors: FieldErrors };

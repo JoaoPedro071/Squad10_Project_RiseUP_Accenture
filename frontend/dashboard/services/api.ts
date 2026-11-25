@@ -72,6 +72,13 @@ export const moveClient = (clientId: string, x: number, y: number) =>
 export const lockClient = (clientId: string, locked: boolean) =>
   request<Client>(`/api/clients/${clientId}/lock`, "PUT", { locked });
 
+/** Modo de identificação: cada tela conectada mostra número e nome por alguns segundos. */
+export const identifyScreens = () =>
+  request<{ seconds: number; numbers: Record<string, number> }>(
+    "/api/clients/identify",
+    "POST",
+  );
+
 // --- Modo foco ---
 export const startFocus = (clientId: string) =>
   request<FocusResponse>("/api/focus", "POST", { clientId });

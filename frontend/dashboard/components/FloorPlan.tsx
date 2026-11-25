@@ -5,13 +5,13 @@ import type { KeyboardEvent, PointerEvent } from "react";
 import { useBoard } from "@/hooks/useBoard";
 import { contentLabel } from "@/lib/content";
 import type { Client, Experience, FocusState, Image } from "@/types/api";
+import BoardToolbar from "./BoardToolbar";
 import FocusBanner from "./FocusBanner";
 import FocusModal from "./FocusModal";
 import LockModal from "./LockModal";
 import ScreenModal from "./ScreenModal";
 import StatusBadge from "./StatusBadge";
 
-const POLL_MS = 3000;
 const KEY_STEP = 2; // % por seta; com Shift anda 10
 const LOCKED_MESSAGE =
   "Esta tela está travada. Use o botão de trava no card para destravar.";
@@ -46,7 +46,7 @@ export default function FloorPlan({
   experiences,
   images,
 }: FloorPlanProps) {
-  const board = useBoard(initialClients, initialFocus, POLL_MS);
+  const board = useBoard(initialClients, initialFocus);
   const { clients, focus } = board;
 
   const planRef = useRef<HTMLDivElement>(null);
@@ -178,14 +178,11 @@ export default function FloorPlan({
         />
       )}
 
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <p
-          role="status"
-          aria-live="polite"
-          className="min-h-6 text-xs text-foreground/60"
-        >
-          {board.message}
-        </p>
+      <BoardToolbar
+        message={board.message}
+        live={board.live}
+        onIdentify={board.identify}
+      >
         <button
           type="button"
           onClick={() => setEditMode((current) => !current)}
@@ -199,7 +196,7 @@ export default function FloorPlan({
           <span aria-hidden="true">{editMode ? "✓ " : "✎ "}</span>
           {editMode ? "Concluir edição" : "Editar posições"}
         </button>
-      </div>
+      </BoardToolbar>
 
       {editMode && (
         <p className="mb-2 text-xs text-foreground/60">
@@ -221,6 +218,7 @@ export default function FloorPlan({
           const position = positionOf(client);
           const draggable = editMode && !client.locked;
           const dragging = drag?.id === client.id;
+          const number = board.numbers?.[client.id];
 
           return (
             <div
@@ -247,7 +245,15 @@ export default function FloorPlan({
                   draggable ? "cursor-grab touch-none select-none" : ""
                 }`}
               >
-                <StatusBadge status={client.status} size="sm" />
+                <span className="flex w-full items-start justify-between gap-1">
+                  <StatusBadge status={client.status} size="sm" />
+                  {number !== undefined && (
+                    <span className="rounded-md bg-accent px-2 text-lg leading-7 font-bold text-white">
+                      <span className="sr-only">Número </span>
+                      {number}
+                    </span>
+                  )}
+                </span>
                 <span className={nameText}>{client.name}</span>
                 <span className={`${detailText} text-foreground/70`}>
                   {contentLabel(client, { experiences, images })}
