@@ -5,6 +5,7 @@ description = "API do Experience Manager (Innovation Center Accenture, Squad 10)
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "argon2-cffi>=23.1",
     "fastapi>=0.115",
     "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.30",

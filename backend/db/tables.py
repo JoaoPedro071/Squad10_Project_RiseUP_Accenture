@@ -77,3 +77,29 @@ class FocusRow(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"))
+
+
+class UserRow(Base):
+    """Pessoa que usa o dashboard. A senha so e guardada como hash (argon2)."""
+
+    __tablename__ = "users"
+
+    pk: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(unique=True)
+    email: Mapped[str] = mapped_column(unique=True)  # sempre em minusculas
+    name: Mapped[str]
+    password_hash: Mapped[str]
+    role: Mapped[str]  # "coordination" ou "support"
+    active: Mapped[bool] = mapped_column(default=True)
+
+
+class SessionRow(Base):
+    """Sessao de login. Guarda so o hash do token (o token fica no cookie)."""
+
+    __tablename__ = "sessions"
+
+    pk: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    token_hash: Mapped[str] = mapped_column(unique=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    expires_at: Mapped[float]  # segundos desde 1970 (UTC)
+    

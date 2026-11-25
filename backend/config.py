@@ -43,3 +43,10 @@ HEARTBEAT_TIMEOUT_SECONDS: float = float(os.getenv("HEARTBEAT_TIMEOUT_SECONDS", 
 # Banco de dados. Padrao: arquivo SQLite na pasta backend (criado sozinho).
 # Para Postgres no futuro, basta trocar a URL.
 DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./experience-manager.db")
+
+
+# --- login do dashboard ---
+# Horas ate a sessao expirar (depois disso, a pessoa entra de novo).
+SESSION_HOURS: float = float(os.getenv("SESSION_HOURS", "12"))
+# Cookie so por HTTPS. Ligado sempre em producao; em desenvolvimento (http://localhost) fica desligado.
+COOKIE_SECURE: bool = APP_ENV == "production" or os.getenv("COOKIE_SECURE", "").lower() == "true"

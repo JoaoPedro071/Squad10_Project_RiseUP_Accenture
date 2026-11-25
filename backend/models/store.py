@@ -16,9 +16,17 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from config import DATABASE_URL, HEARTBEAT_TIMEOUT_SECONDS
+from config import DATABASE_URL, HEARTBEAT_TIMEOUT_SECONDS, SESSION_HOURS
 from db.database import Base, create_tables, make_engine
-from db.tables import ClientRow, ExperienceRow, FocusRow, ImageRow, SettingsRow
+from db.tables import (
+    ClientRow,
+    ExperienceRow,
+    FocusRow,
+    ImageRow,
+    SessionRow,
+    SettingsRow,
+    UserRow,
+)
 from models.seed import ONLINE_AT_START, seed_clients, seed_database
 from schemas.client import Client
 from schemas.display import (
@@ -32,6 +40,8 @@ from schemas.experience import Experience
 from schemas.focus import FocusState
 from schemas.image import Image
 from schemas.settings import Settings
+from schemas.user import User
+from services.auth import normalize_email
 from services.validation import clean_sectors, clean_tags
 
 FOCUS_ROW_ID = 1
@@ -403,5 +413,56 @@ class Store:
         standby = self.find_image(standby_id) if standby_id else None
         return DisplayStandby(image=standby)
 
+    # --- usuarios e sessoes (login do dashboard) ---
+    def create_user(self, email: str, name: str, password_hash: str, role: str) -> User:
+        """Cria um usuario. Levanta ValueError se o e-mail ja existe."""
+        email = normalize_email(email)
+        with self._session() as s:
+            if s.scalar(select(UserRow).where(UserRow.email == email)) is not None:
+                raise ValueError("Já existe um usuário com este e-mail.")
+            row = UserRow(
+                id=f"usr-{uuid.uuid4().hex[:8]}",
+                email=email,
+                name=name.strip(),
+                password_hash=password_hash,
+                role=role,
+                active=True,
+            )
+            s.add(row)
+            s.commit()
+            return User.model_validate(row, from_attributes=True)
 
+    def find_login(self, email: str) -> tuple[User, str] | None:
+        """Usuario ativo e o hash da senha, para conferir o login."""
+        with self._session() as s:
+            row = s.scalar(select(UserRow).where(UserRow.email == normalize_email(email)))
+            if row is None or not row.active:
+                return None
+            return User.model_validate(row, from_attributes=True), row.password_hash
+
+    def create_session(self, user_id: str, token_hash: str) -> None:
+        expires_at = self._clock().timestamp() + SESSION_HOURS * 3600
+        with self._session() as s:
+            s.add(SessionRow(token_hash=token_hash, user_id=user_id, expires_at=expires_at))
+            s.commit()
+
+    def find_session_user(self, token_hash: str) -> User | None:
+        """Dono da sessao, se ela existe, nao expirou e o usuario esta ativo."""
+        with self._session() as s:
+            session = s.scalar(select(SessionRow).where(SessionRow.token_hash == token_hash))
+            if session is None or session.expires_at <= self._clock().timestamp():
+                return None
+            user = self._row(s, UserRow, session.user_id)
+            if user is None or not user.active:
+                return None
+            return User.model_validate(user, from_attributes=True)
+
+    def delete_session(self, token_hash: str) -> None:
+        with self._session() as s:
+            session = s.scalar(select(SessionRow).where(SessionRow.token_hash == token_hash))
+            if session is not None:
+                s.delete(session)
+                s.commit()
+
+    
 store = Store()
