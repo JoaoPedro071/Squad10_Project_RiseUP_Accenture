@@ -32,6 +32,7 @@ from schemas.experience import Experience
 from schemas.focus import FocusState
 from schemas.image import Image
 from schemas.settings import Settings
+from services.validation import clean_sectors, clean_tags
 
 FOCUS_ROW_ID = 1
 SETTINGS_ROW_ID = 1
@@ -250,6 +251,8 @@ class Store:
             url=str(data["url"]).strip(),
             type=data["type"],
             orientation=data["orientation"],
+            sectors=clean_sectors(data.get("sectors")),
+            tags=clean_tags(data.get("tags")),
             active=True,
         )
         with self._session() as s:

@@ -14,19 +14,22 @@ def seed_experiences() -> list[Experience]:
         Experience(id="exp-1", title="Cibersegurança",
                    description="Demonstração de detecção de ameaças em tempo real.",
                    url="/demo?tema=ciberseguranca", type="web",
-                   orientation="landscape", active=True),
+                   orientation="landscape", sectors=["finance", "retail"],
+                   tags=["segurança"], active=True),
         Experience(id="exp-2", title="Inteligência Artificial",
                    description="Painel interativo sobre aplicações de IA generativa.",
-                   url="/demo?tema=ia", type="web", orientation="any", active=True),
+                   url="/demo?tema=ia", type="web", orientation="any",
+                   sectors=["emerging_tech"], tags=["IA generativa"], active=True),
         Experience(id="exp-3", title="Logística Inteligente",
                    description="Mapa de rotas e previsão de demanda.",
                    url="/demo?tema=logistica", type="web",
-                   orientation="landscape", active=True),
+                   orientation="landscape", sectors=["retail"],
+                   tags=["logística", "dados"], active=True),
         # exp-4 (Cartaz Institucional) virou a imagem img-1.
         Experience(id="exp-5", title="Computação Quântica (antiga)",
                    description="Experiência desativada, mantida só no catálogo.",
                    url="/demo?tema=quantica", type="web", orientation="any",
-                   active=False),
+                   sectors=["emerging_tech"], tags=[], active=False),
     ]
 
 

@@ -20,6 +20,7 @@ VALID = {
     "url": "https://example.com",
     "type": "web",
     "orientation": "any",
+    "sectors": ["emerging_tech"],
 }
 
 
@@ -28,7 +29,10 @@ def test_list_experiences_camel_case():
     assert r.status_code == 200
     data = r.json()
     assert len(data) == 4
-    assert set(data[0]) == {"id", "title", "description", "url", "type", "orientation", "active"}
+    assert set(data[0]) == {
+        "id", "title", "description", "url", "type", "orientation",
+        "sectors", "tags", "active",
+    }
 
 
 def test_list_clients_camel_case():
@@ -70,6 +74,40 @@ def test_create_experience_field_errors():
     assert errors["url"] == "Use um endereço começando com http:// ou https://."
     assert errors["type"] == "Escolha o tipo de conteúdo."
     assert errors["orientation"] == "Escolha a orientação."
+    assert errors["sectors"] == "Escolha ao menos um setor."
+
+
+
+def test_create_experience_saves_sectors_and_clean_tags():
+    r = client.post("/api/experiences", json={
+        **VALID,
+        "sectors": ["retail", "finance", "retail"],
+        "tags": ["  Varejo ", "varejo", "", "Dados"],
+    })
+    assert r.status_code == 201
+    body = r.json()
+    assert body["sectors"] == ["finance", "retail"]  # sem repetir, na ordem da lista
+    assert body["tags"] == ["Varejo", "Dados"]  # sem espacos, vazias ou repetidas
+
+
+def test_create_experience_rejects_unknown_sector():
+    r = client.post("/api/experiences", json={**VALID, "sectors": ["saude"]})
+    assert r.status_code == 400
+    assert r.json()["fieldErrors"]["sectors"] == "Escolha setores da lista."
+
+
+def test_create_experience_tag_limits():
+    r = client.post("/api/experiences", json={**VALID, "tags": list("abcdef")})
+    assert r.json()["fieldErrors"]["tags"] == "Use no máximo 5 tags."
+    r = client.post("/api/experiences", json={**VALID, "tags": ["x" * 31]})
+    assert r.json()["fieldErrors"]["tags"] == "Use no máximo 30 caracteres por tag."
+    r = client.post("/api/experiences", json={**VALID, "tags": "ia"})
+    assert r.json()["fieldErrors"]["tags"] == "Informe as tags como uma lista."
+
+
+def test_seed_experiences_have_sectors():
+    for experience in client.get("/api/experiences").json():
+        assert experience["sectors"], experience["id"]
 
 
 def test_create_experience_accepts_internal_path():
