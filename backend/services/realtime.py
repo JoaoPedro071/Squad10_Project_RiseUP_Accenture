@@ -7,6 +7,7 @@ Mensagens (JSON em camelCase):
 Rode com UM worker: as conexoes ficam na memoria deste processo.
 """
 
+import asyncio
 import json
 import logging
 
@@ -102,12 +103,37 @@ class Hub:
         self._last_board = key
         await self._send(self.dashboards, message)
 
-    async def refresh(self, force_client: str | None = None) -> None:
+    async def refresh(
+        self, force_client: str | None = None, board_only_if_changed: bool = False
+    ) -> None:
         """Chamado depois de qualquer alteracao: envia o novo conteudo as telas
         que mudaram (e sempre a force_client) e o estado ao dashboard."""
         for client_id in list(self.players):
             await self._send_display(client_id, force=client_id == force_client)
-        await self._send_board()
+        await self._send_board(only_if_changed=board_only_if_changed)
+
+    # --- sinal de vida ---
+    async def heartbeat(self, client_id: str, orientation: str, resolution: str | None) -> None:
+        """Sinal de vida recebido pelo WebSocket (mesmo efeito do POST /heartbeat)."""
+        store.record_heartbeat(client_id, orientation, resolution)
+        await self.refresh(board_only_if_changed=True)
+
+    async def tick(self) -> None:
+        """Roda a cada poucos segundos: avisa o dashboard quando uma tela passa
+        do tempo limite sem sinal de vida (vira Desligada)."""
+        await self._send_board(only_if_changed=True)
 
 
 hub = Hub()
+
+TICK_SECONDS = 2
+
+
+async def run_ticker() -> None:
+    """Laco em segundo plano iniciado junto com a API (main.py)."""
+    while True:
+        await asyncio.sleep(TICK_SECONDS)
+        try:
+            await hub.tick()
+        except Exception:
+            logger.exception("Falha na checagem periodica das telas")

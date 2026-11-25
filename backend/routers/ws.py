@@ -6,6 +6,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from config import CORS_ORIGINS
 from models.store import store
+from routers.clients import RESOLUTION
 from services.realtime import hub
 
 router = APIRouter()
@@ -30,6 +31,18 @@ async def _messages(websocket: WebSocket):
             yield message
 
 
+async def _heartbeat(client_id: str, message: dict) -> None:
+    """{"type": "heartbeat", "orientation": "landscape", "resolution": "1920x1080"}
+    Mensagem com dados invalidos e ignorada."""
+    orientation = message.get("orientation")
+    if orientation not in ("landscape", "portrait"):
+        return
+    resolution = message.get("resolution")
+    if not isinstance(resolution, str) or not RESOLUTION.match(resolution):
+        resolution = None
+    await hub.heartbeat(client_id, orientation, resolution)
+
+
 @router.websocket("/ws/player/{client_id}")
 async def player_socket(websocket: WebSocket, client_id: str):
     await websocket.accept()
@@ -41,8 +54,9 @@ async def player_socket(websocket: WebSocket, client_id: str):
         return
     await hub.add_player(client_id, websocket)
     try:
-        async for _message in _messages(websocket):
-            pass  # sinal de vida e confirmacao chegam nas proximas etapas
+        async for message in _messages(websocket):
+            if message.get("type") == "heartbeat":
+                await _heartbeat(client_id, message)
     except WebSocketDisconnect:
         pass
     finally:
