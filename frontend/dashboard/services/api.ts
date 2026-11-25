@@ -82,8 +82,23 @@ export const endFocus = () => request<FocusResponse>("/api/focus", "DELETE");
 export const createExperience = (input: ExperienceInput) =>
   request<Experience>("/api/experiences", "POST", input);
 
+/** Edita todos os campos; as telas que exibem a experiência passam a mostrar a versão nova. */
+export const updateExperience = (
+  experienceId: string,
+  input: ExperienceInput,
+) => request<Experience>(`/api/experiences/${experienceId}`, "PUT", input);
+
+/** Inativar não apaga: só impede novas atribuições. */
+export const setExperienceActive = (experienceId: string, active: boolean) =>
+  request<Experience>(`/api/experiences/${experienceId}/active`, "PUT", {
+    active,
+  });
+
 export const createImage = (input: ImageInput) =>
   request<Image>("/api/images", "POST", input);
+
+export const updateImage = (imageId: string, input: ImageInput) =>
+  request<Image>(`/api/images/${imageId}`, "PUT", input);
 
 /** Inativar não apaga: só impede novas atribuições. */
 export const setImageActive = (imageId: string, active: boolean) =>

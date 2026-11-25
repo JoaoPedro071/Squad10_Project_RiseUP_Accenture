@@ -14,6 +14,8 @@ const initialValues: ExperienceInput = {
   url: "",
   type: "web",
   orientation: "any",
+  sectors: [],
+  tags: [],
 };
 
 // Ordem dos campos na tela: usada para focar o primeiro com erro.

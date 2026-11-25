@@ -8,6 +8,9 @@ export type ContentOrientation = Orientation | "any";
 /** Estado calculado pelo backend. Prioridade: off > paused > error > busy > standby. */
 export type ScreenStatus = "busy" | "standby" | "paused" | "error" | "off";
 
+/** Setores (lista fechada). Rótulos em lib/sectors.ts. */
+export type ExperienceSector = "finance" | "retail" | "emerging_tech" | "other";
+
 export type Experience = {
   id: string;
   title: string;
@@ -15,6 +18,8 @@ export type Experience = {
   url: string;
   type: "web";
   orientation: ContentOrientation;
+  sectors: ExperienceSector[]; // ao menos um
+  tags: string[]; // livres, até 5
   active: boolean;
 };
 
