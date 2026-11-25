@@ -36,3 +36,8 @@ class ExperienceCreate(CamelModel):
     orientation: Any = None
     sectors: Any = None
     tags: Any = None
+
+class ExperienceActiveUpdate(CamelModel):
+    """Corpo do PUT /api/experiences/{id}/active."""
+
+    active: Any = None
