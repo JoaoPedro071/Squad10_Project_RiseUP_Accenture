@@ -57,6 +57,8 @@ async def player_socket(websocket: WebSocket, client_id: str):
         async for message in _messages(websocket):
             if message.get("type") == "heartbeat":
                 await _heartbeat(client_id, message)
+            elif message.get("type") == "ack" and isinstance(message.get("version"), int):
+                await hub.ack(client_id, message["version"])
     except WebSocketDisconnect:
         pass
     finally:

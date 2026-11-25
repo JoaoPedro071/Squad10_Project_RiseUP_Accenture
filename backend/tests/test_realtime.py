@@ -127,3 +127,49 @@ def test_tick_tells_dashboard_when_screen_goes_off(tc):
         tc.portal.call(hub.tick)
         statuses = {c["id"]: c["status"] for c in board.receive_json()["clients"]}
         assert statuses["cli-1"] == "off"
+
+
+# ---------- confirmacao de recebimento ----------
+
+def test_screen_ack_reaches_dashboard(tc):
+    with tc.websocket_connect("/ws/player/cli-2") as player, \
+            tc.websocket_connect("/ws/dashboard") as board:
+        player.receive_json()
+        board.receive_json()
+        tc.put("/api/clients/cli-2/content", json={"experienceId": "exp-3"})
+        version = player.receive_json()["version"]
+        board.receive_json()  # estado novo
+        player.send_json({"type": "ack", "version": version})
+        assert board.receive_json() == {"type": "ack", "clientId": "cli-2", "version": version}
+
+
+def test_old_ack_is_ignored(tc):
+    with tc.websocket_connect("/ws/player/cli-2") as player, \
+            tc.websocket_connect("/ws/dashboard") as board:
+        player.receive_json()
+        board.receive_json()
+        tc.put("/api/clients/cli-2/content", json={"experienceId": "exp-3"})
+        version = player.receive_json()["version"]
+        board.receive_json()
+        player.send_json({"type": "ack", "version": version - 1})  # antigo
+        player.send_json({"type": "ack", "version": version})
+        assert board.receive_json()["version"] == version
+
+
+# ---------- modo de identificacao ----------
+
+def test_identify_reaches_screens_and_dashboard(tc):
+    with tc.websocket_connect("/ws/player/cli-3") as player, \
+            tc.websocket_connect("/ws/dashboard") as board:
+        player.receive_json()
+        board.receive_json()
+        r = tc.post("/api/clients/identify")
+        assert r.status_code == 200
+        assert r.json() == {
+            "seconds": 10,
+            "numbers": {"cli-1": 1, "cli-2": 2, "cli-3": 3, "cli-4": 4},
+        }
+        assert player.receive_json() == {
+            "type": "identify", "number": 3, "name": "Tablet Recepção", "seconds": 10,
+        }
+        assert board.receive_json()["type"] == "identify"

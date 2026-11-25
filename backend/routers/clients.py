@@ -13,6 +13,7 @@ from schemas.client import (
     PositionUpdate,
 )
 from schemas.display import DisplayState
+from services.realtime import IDENTIFY_SECONDS, hub
 
 router = APIRouter(prefix="/api/clients", tags=["clients"])
 
@@ -33,6 +34,14 @@ def _is_percent(value: object) -> bool:
 @router.get("", response_model=list[Client])
 async def list_clients():
     return store.list_clients()
+
+
+@router.post("/identify")
+async def identify_screens():
+    """Modo de identificacao: cada tela conectada mostra numero e nome
+    por alguns segundos. Devolve o numero de cada tela."""
+    numbers = await hub.identify()
+    return {"seconds": IDENTIFY_SECONDS, "numbers": numbers}
 
 
 @router.get("/{client_id}/display", response_model=DisplayState)

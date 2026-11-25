@@ -2,6 +2,9 @@
 
 Mensagens (JSON em camelCase):
 - servidor -> tela:      {"type": "display", "version": n, "state": DisplayState}
+- tela -> servidor:      {"type": "heartbeat", ...} e {"type": "ack", "version": n}
+- servidor -> dashboard: {"type": "ack", "clientId": ..., "version": n}
+- identificacao:         {"type": "identify", ...} para telas e dashboard
 - servidor -> dashboard: {"type": "state", "focus": ..., "clients": [...]}
 
 Rode com UM worker: as conexoes ficam na memoria deste processo.
@@ -19,6 +22,8 @@ from schemas.display import DisplayState
 
 logger = logging.getLogger(__name__)
 _display_json = TypeAdapter(DisplayState)
+
+IDENTIFY_SECONDS = 10
 
 
 class Hub:
@@ -122,6 +127,38 @@ class Hub:
         """Roda a cada poucos segundos: avisa o dashboard quando uma tela passa
         do tempo limite sem sinal de vida (vira Desligada)."""
         await self._send_board(only_if_changed=True)
+
+
+    # --- confirmacao de recebimento (US-12) ---
+    async def ack(self, client_id: str, version: int) -> None:
+        """A tela confirmou que exibiu a mudanca. Avisos antigos sao ignorados."""
+        if version != self._version.get(client_id):
+            return
+        await self._send(
+            self.dashboards, {"type": "ack", "clientId": client_id, "version": version}
+        )
+
+    # --- modo de identificacao ---
+    async def identify(self) -> dict[str, int]:
+        """Cada tela conectada mostra seu numero e nome por alguns segundos.
+        O numero segue a ordem das telas (o mesmo para telas e dashboard)."""
+        clients = store.list_clients()
+        numbers = {client.id: index + 1 for index, client in enumerate(clients)}
+        for client in clients:
+            await self._send(
+                self.players.get(client.id, set()),
+                {
+                    "type": "identify",
+                    "number": numbers[client.id],
+                    "name": client.name,
+                    "seconds": IDENTIFY_SECONDS,
+                },
+            )
+        await self._send(
+            self.dashboards,
+            {"type": "identify", "numbers": numbers, "seconds": IDENTIFY_SECONDS},
+        )
+        return numbers
 
 
 hub = Hub()
