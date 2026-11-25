@@ -20,9 +20,11 @@ Cada tela abre o player com o seu id: `http://<player>/?client=<id da tela>`. Em
 
 ## Como funciona
 
-- A cada **1,5 s** consulta `GET /api/clients/{id}/display` e exibe: experiência, imagem, stand-by (imagem global ou preto) ou pausa (preto).
-- A cada **5 s** envia `POST /api/clients/{id}/heartbeat` com a orientação e a resolução da tela. Sem aviso por 15 s, o dashboard mostra a tela como *Desligada*.
-- Sem conexão, mantém o que está na tela e tenta de novo. Avisos próprios: "Conectando...", "Tela não identificada" (sem `?client=`) e "Tela não cadastrada" (id desconhecido).
+- Conecta ao WebSocket `/ws/player/{id}` e exibe na hora o que receber: experiência, imagem, stand-by (imagem global ou preto) ou pausa (preto).
+- A cada **5 s** (e ao girar ou redimensionar a tela) envia o sinal de vida com a orientação e a resolução. Sem aviso por 15 s, o dashboard mostra a tela como *Desligada*.
+- Confirma cada mudança depois de exibi-la; é isso que faz o dashboard mostrar "Concluído".
+- Modo de identificação: mostra o número e o nome da tela por cima do conteúdo por 10 s.
+- Sem conexão, mantém o que está na tela, mostra "Reconectando..." no canto e tenta de novo com espera crescente (1 s até 30 s). Avisos próprios: "Conectando...", "Tela não identificada" (sem `?client=`) e "Tela não cadastrada" (id desconhecido).
 - Sem elementos interativos e sem cursor.
 
 ## Verificar

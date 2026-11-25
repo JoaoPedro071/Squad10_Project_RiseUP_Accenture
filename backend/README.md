@@ -9,7 +9,7 @@ Requer o [uv](https://docs.astral.sh/uv/). Ele usa o Python 3.12 (`.python-versi
 ```bash
 uv sync                                         # cria o .venv e instala tudo
 uv run uvicorn main:app --reload --port 8000
-uv run pytest                                   # 70 testes
+uv run pytest                                   # 101 testes
 ```
 
 Dependências: `uv add <pacote>` (app) ou `uv add --dev <pacote>` (só desenvolvimento). Sempre commite o `pyproject.toml` junto com o `uv.lock`.
@@ -66,7 +66,7 @@ Se o front for aberto por outro endereço (IP da máquina, outra porta), acresce
 
 Conteúdo com orientação `any` e o stand-by nunca geram erro de orientação.
 
-**Experiência:** `id, title, description, url, type ("web"), orientation ("landscape" | "portrait" | "any"), active`.
+**Experiência:** `id, title, description, url, type ("web"), orientation ("landscape" | "portrait" | "any"), sectors, tags, active`. Setores em lista fechada (`finance`, `retail`, `emerging_tech`, `other`, ao menos um); tags livres (até 5). Inativar não apaga: só impede novas atribuições, e quem já exibe continua até ser trocado.
 
 **Imagem:** `id, title, description, url, orientation, active`. Inativar não apaga: só impede novas atribuições, e quem já exibe continua até ser trocado.
 
@@ -95,8 +95,9 @@ Conteúdo com orientação `any` e o stand-by nunca geram erro de orientação.
 | `GET /api/focus` | Dashboard | n/a | `{focus, clients}` | n/a |
 | `POST /api/focus` | Dashboard | `{clientId}` | 201 `{focus, clients}` | 404, 422 (tela desligada), 409 (já ativo) |
 | `DELETE /api/focus` | Dashboard | n/a | `{focus: null, clients}` | n/a |
-| `POST /api/clients/{id}/heartbeat` | Player, a cada ~5 s | `{orientation, resolution?}` | 204 | 422, 404 |
-| `GET /api/clients/{id}/display` | Player, a cada ~1,5 s | n/a | `DisplayState` (`no-store`) | 404 |
+| `POST /api/clients/identify` | Dashboard | n/a | `{seconds, numbers}` | n/a |
+| `POST /api/clients/{id}/heartbeat` | Testes e depuração (o player usa o WebSocket) | `{orientation, resolution?}` | 204 | 422, 404 |
+| `GET /api/clients/{id}/display` | Testes e depuração (o player usa o WebSocket) | n/a | `DisplayState` (`no-store`) | 404 |
 | `GET /api/health` | Monitoramento | n/a | `{status: "ok"}` | n/a |
 
 Formatos de erro: validação de cadastro devolve 400 `{"fieldErrors": {campo: mensagem}}`; os demais devolvem `{"error": "mensagem"}`, sempre em português.
@@ -118,7 +119,7 @@ Só aceita itens existentes e ativos, recusa `displayImg: true` sem imagem e é 
 
 ### Sinal de vida (`POST /api/clients/{id}/heartbeat`)
 
-O player envia a cada ~5 s a orientação atual da máquina (`"landscape"` ou `"portrait"`, obrigatória) e, opcionalmente, a resolução (`"1920x1080"`). Responde 204, sem corpo.
+Pelo WebSocket (ou por esta rota), o player envia a cada ~5 s a orientação atual da máquina (`"landscape"` ou `"portrait"`, obrigatória) e, opcionalmente, a resolução (`"1920x1080"`). Responde 204, sem corpo.
 
 ### O que a tela exibe (`GET /api/clients/{id}/display`)
 
@@ -132,6 +133,26 @@ Prioridade: **Em pausa → imagem → experiência → stand-by**.
 | `{"kind": "standby", "image": Image \| null}` | A imagem de stand-by, ou preto se `null` |
 
 Carregando, falha ao carregar o conteúdo e sem conexão são estados **locais** do player: não vêm daqui.
+
+### Tempo real (WebSocket)
+
+| Rota | Quem conecta | Recebe ao conectar e a cada mudança |
+|---|---|---|
+| `/ws/player/{clientId}` | Player | `{"type": "display", "version": n, "state": DisplayState}` (tela desconhecida: fecha com código 4404) |
+| `/ws/dashboard` | Dashboard | `{"type": "state", "focus", "clients"}` |
+
+O player envia pelo mesmo canal:
+
+| Mensagem | Efeito |
+|---|---|
+| `{"type": "heartbeat", "orientation", "resolution?"}` (a cada ~5 s) | Sinal de vida, igual ao `POST /heartbeat` |
+| `{"type": "ack", "version": n}` | Confirma que exibiu a mudança; o dashboard recebe `{"type": "ack", "clientId", "version"}` e mostra "Concluído" |
+
+- Toda alteração bem-sucedida (`POST`, `PUT` ou `DELETE` em `/api`) avisa as telas afetadas e o dashboard. A tela que teve o conteúdo trocado sempre recebe o aviso, para poder confirmar.
+- Uma checagem a cada 2 s avisa o dashboard quando uma tela passa do tempo limite sem sinal de vida.
+- `POST /api/clients/identify`: cada tela conectada recebe `{"type": "identify", "number", "name", "seconds"}` e mostra o número por 10 s; o dashboard recebe `{"type": "identify", "numbers", "seconds"}`.
+- A origem da conexão é conferida com `CORS_ORIGINS` (o navegador não aplica CORS a WebSocket).
+- As conexões ficam na memória do processo: rode com **um único worker**.
 
 ## Guia de integração do front
 
@@ -151,7 +172,7 @@ O dashboard e o player já usam esta API. Referência do que mudou em relação 
 | Display `waiting` | `standby` (com `image` ou `null`) |
 | Display `error` | Removido da API; continua como estado local do player |
 | Experiência `type: "image"` | Imagens têm catálogo próprio (`/api/images`) |
-| (não existia) | Player envia `POST /heartbeat` a cada ~5 s |
+| (não existia) | Player conecta ao WebSocket: recebe o conteúdo, envia o sinal de vida e confirma cada mudança |
 
 Tipos TypeScript equivalentes:
 
@@ -199,14 +220,14 @@ Rótulos sugeridos para a interface: `busy` Em uso · `standby` Stand-by · `pau
 ```
 pyproject.toml     dependências (uv) e configuração do pytest
 uv.lock            versões exatas das dependências (gerado pelo uv)
-main.py            app, CORS e routers
+main.py            app, CORS, routers e aviso em tempo real após cada alteração
 config.py          variáveis de ambiente (APP_ENV, CORS_ORIGINS, HEARTBEAT_TIMEOUT_SECONDS, DATABASE_URL)
 errors.py          formatos de erro que o front espera
-routers/           experiences.py, images.py, settings.py, clients.py (telas), focus.py
+routers/           experiences.py, images.py, settings.py, clients.py (telas), focus.py, ws.py (WebSocket)
 schemas/           formatos dos dados (Pydantic, JSON em camelCase)
 db/                conexão e tabelas do banco (SQLAlchemy)
 models/            store (banco + sinal de vida em memória) e seed
-services/          validation.py (e ai_service.py no futuro)
+services/          validation.py, realtime.py (conexões WebSocket) e ai_service.py no futuro
 tests/             pytest
 ```
 
@@ -215,6 +236,5 @@ Observação: o documento de arquitetura previa `monitors.py` e `assignments.py`
 ## Próximos passos
 
 1. Postgres no deploy (trocar `DATABASE_URL`) e migrações com Alembic.
-2. Pareamento das telas por código e modo de identificação.
-3. WebSocket no lugar do polling do player.
-4. IA: `POST /api/ai/command`, sempre com prévia e confirmação do usuário.
+2. Pareamento das telas por código, com token por tela (substitui o `?client=`).
+3. IA: `POST /api/ai/command`, sempre com prévia e confirmação do usuário.
