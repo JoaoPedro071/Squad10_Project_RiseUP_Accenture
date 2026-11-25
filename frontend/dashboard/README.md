@@ -25,8 +25,8 @@ Se o dashboard for aberto por outro endereço, inclua-o em `CORS_ORIGINS` no bac
 |---|---|
 | `/` | Planta: status das telas, troca de conteúdo, Modo foco, mover e travar posição |
 | `/clients` | As mesmas telas em lista |
-| `/experiences`, `/experiences/new` | Catálogo de experiências |
-| `/images`, `/images/new` | Catálogo de imagens (sugere a orientação pela proporção) |
+| `/experiences`, `/experiences/new`, `/experiences/[id]/edit` | Catálogo de experiências: filtro Ativas/Inativas, setores e tags, editar (com confirmação se estiver em uso) e inativar |
+| `/images`, `/images/new`, `/images/[id]/edit` | Catálogo de imagens: cadastrar (sugere a orientação pela proporção), editar e inativar |
 | `/settings` | Imagem de stand-by |
 
 Planta e lista se atualizam a cada 3 s. Com o backend fora do ar, aparece uma tela de erro com "Tentar novamente".
