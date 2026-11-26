@@ -1,6 +1,7 @@
 // Sessão nas páginas do servidor: repassa o cookie do navegador ao backend.
 // Só pode ser usado em páginas e layouts do servidor (lê next/headers).
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE } from "@/lib/config";
 import { ApiError, fetchMe } from "@/services/api";
@@ -25,8 +26,9 @@ export async function withSession<T>(load: (cookie: string) => Promise<T>): Prom
   return result;
 }
 
-/** Quem está logado (para o menu). null = ninguém ou backend fora do ar. */
-export async function currentUser(): Promise<User | null> {
+/** Quem está logado. null = ninguém ou backend fora do ar.
+ * cache: o menu e a página usam a mesma consulta em cada carregamento. */
+export const currentUser = cache(async (): Promise<User | null> => {
   const cookie = await sessionCookie();
   if (!cookie) return null;
   try {
@@ -34,4 +36,11 @@ export async function currentUser(): Promise<User | null> {
   } catch {
     return null;
   }
+});
+
+/** Para páginas sem outros dados: usuário logado ou vai para o login. */
+export async function requireUser(): Promise<User> {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  return user;
 }
