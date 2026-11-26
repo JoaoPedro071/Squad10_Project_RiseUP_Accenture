@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { canManage } from "@/lib/permissions";
+import BrandMark from "./BrandMark";
 import type { User } from "@/types/api";
 import LogoutButton from "./LogoutButton";
 
@@ -17,7 +18,9 @@ const roleLabel = { coordination: "Coordenação", support: "Apoio" };
 export default function Navbar({ user }: { user: User | null }) {
   return (
     <nav className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-6 py-3">
-      <span className="mr-4 font-bold text-accent">Experience Platform</span>
+      <span className="mr-4">
+        <BrandMark />
+      </span>
       {user &&
         links
           .filter((link) => !link.coordinationOnly || canManage(user))
