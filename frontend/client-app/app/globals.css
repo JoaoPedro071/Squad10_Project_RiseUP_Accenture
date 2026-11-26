@@ -1,21 +1,43 @@
 @import "tailwindcss";
 
+/*
+ * Marca Accenture no player (modo escuro): fundo preto, roxo da marca e Arial
+ * (troque a fonte só aqui quando a licença da Graphik for confirmada).
+ */
 :root {
   --background: #000000;
-  --foreground: #f3f0fa;
-  --accent: #7c3aed;
+  --foreground: #ffffff;
+  --muted: #96968c;
+  --accent: #a100ff;
+  --accent-light: #be82ff;
+  --font-brand: Arial, Helvetica, sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
   --color-accent: var(--accent);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-accent-light: var(--accent-light);
+  --font-sans: var(--font-brand);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-brand);
+  /* O guia pede texto em peso médio (ou mais) no modo escuro. */
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Quem prefere menos movimento: sem animações. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

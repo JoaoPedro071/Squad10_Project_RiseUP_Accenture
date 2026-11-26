@@ -31,6 +31,7 @@ export default function DisplayController() {
       <StatusScreen
         title={status === "reconnecting" ? "Reconectando..." : "Conectando..."}
         detail={status === "reconnecting" ? "Sem conexão com o servidor." : undefined}
+        waiting
       />
     );
   }
@@ -42,8 +43,12 @@ export default function DisplayController() {
         // Discreto: o conteúdo continua na tela enquanto reconecta.
         <p
           role="status"
-          className="fixed right-3 bottom-3 rounded-full bg-black/60 px-3 py-1 text-xs text-white/70"
+          className="fixed right-3 bottom-3 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1 text-xs text-white/80"
         >
+          <span
+            aria-hidden="true"
+            className="h-2 w-2 rounded-full bg-accent motion-safe:animate-pulse"
+          />
           Reconectando...
         </p>
       )}
