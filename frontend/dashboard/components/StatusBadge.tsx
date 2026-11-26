@@ -16,7 +16,7 @@ export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
   const { icon: Icon, label, style } = statusConfig[status];
   return (
     <span
-      className={`inline-flex items-center rounded-full border font-bold ${sizes[size].box} ${style}`}
+      className={`inline-flex shrink-0 items-center rounded-full border font-bold whitespace-nowrap ${sizes[size].box} ${style}`}
     >
       <Icon aria-hidden="true" className={sizes[size].icon} strokeWidth={2.25} />
       {label}

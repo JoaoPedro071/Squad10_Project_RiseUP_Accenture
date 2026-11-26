@@ -1,8 +1,11 @@
+import { ExternalLink, Focus, Monitor, RotateCw, TriangleAlert } from "lucide-react";
 import { CLIENT_APP_URL } from "@/lib/config";
 import { contentLabel, pendingNote } from "@/lib/content";
 import type { Catalog } from "@/lib/content";
 import { screenOrientationText } from "@/lib/orientation";
+import { ui } from "@/lib/ui";
 import type { Client } from "@/types/api";
+import Notice from "./Notice";
 import StatusBadge from "./StatusBadge";
 
 type ClientCardProps = {
@@ -27,38 +30,46 @@ export default function ClientCard({
   const note = pendingNote(client);
 
   return (
-    <article className="rounded-lg border border-border bg-surface p-4">
+    <article className={`${ui.card} flex flex-col`}>
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-lg font-semibold">
-          {number !== undefined && (
-            <span className="mr-2 rounded-md bg-accent px-2 text-white">
-              <span className="sr-only">Número </span>
-              {number}
-            </span>
-          )}
-          {client.name}
-        </h2>
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-accent/15 text-accent-light">
+            <Monitor aria-hidden="true" className="h-5 w-5" />
+            {number !== undefined && (
+              <span className="absolute -top-2 -right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-accent px-1 text-xs font-bold text-white">
+                <span className="sr-only">Número </span>
+                {number}
+              </span>
+            )}
+          </span>
+          <h2 className="text-lg leading-tight font-bold">{client.name}</h2>
+        </div>
         <StatusBadge status={client.status} />
       </div>
-      <p className="mt-2 text-sm text-foreground/80">
-        {contentLabel(client, catalog)}
-      </p>
-      <p className="mt-3 text-xs text-foreground/60">
+
+      <p className="mt-3 text-sm">{contentLabel(client, catalog)}</p>
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
+        <RotateCw aria-hidden="true" className="h-3.5 w-3.5" />
         {screenOrientationText(client)}
       </p>
       {client.orientationMismatch && (
-        <p className="mt-1 text-xs text-orange-400">
-          <span aria-hidden="true">⚠ </span>A orientação da tela não combina com
-          o conteúdo
+        <p className="mt-1 flex items-center gap-1.5 text-xs text-status-error">
+          <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5" />
+          A orientação da tela não combina com o conteúdo
         </p>
       )}
-      {note && <p className="mt-1 text-xs text-yellow-300">{note}</p>}
-      <div className="mt-4 flex flex-wrap gap-2">
+      {note && (
+        <Notice variant="warning" className="mt-3 text-xs">
+          {note}
+        </Notice>
+      )}
+
+      <div className="mt-auto flex flex-wrap gap-2 pt-4">
         <button
           type="button"
           onClick={onConfigure}
           disabled={busy}
-          className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+          className={ui.buttonPrimary}
         >
           {busy ? "Atualizando..." : "Trocar conteúdo"}
         </button>
@@ -66,17 +77,20 @@ export default function ClientCard({
           type="button"
           onClick={onFocus}
           disabled={busy || client.status === "off" || focusActive}
-          className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+          className={ui.buttonSecondary}
         >
+          <Focus aria-hidden="true" className="h-4 w-4" />
           Modo foco
         </button>
         <a
           href={`${CLIENT_APP_URL}/?client=${client.id}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-11 items-center rounded-md px-3 text-sm text-purple-300 underline hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
+          className={ui.buttonGhost}
         >
+          <ExternalLink aria-hidden="true" className="h-4 w-4" />
           Abrir tela
+          <span className="sr-only"> (abre em nova aba)</span>
         </a>
       </div>
     </article>

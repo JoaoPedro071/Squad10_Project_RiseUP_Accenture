@@ -1,6 +1,9 @@
-// Linha de avisos da planta e da lista: mensagem da última ação, aviso de
+// Barra da planta e da lista: legenda, mensagem da última ação, aviso de
 // conexão em tempo real e o botão "Identificar telas".
+import { Hash } from "lucide-react";
 import type { ReactNode } from "react";
+import { ui } from "@/lib/ui";
+import Notice from "./Notice";
 import StatusLegend from "./StatusLegend";
 
 type BoardToolbarProps = {
@@ -17,30 +20,25 @@ export default function BoardToolbar({
   children,
 }: BoardToolbarProps) {
   return (
-    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-      <div className="min-h-6 text-xs text-foreground/60">
-        <StatusLegend className="mb-1" />
-        <p role="status" aria-live="polite">
-          {message}
-        </p>
-        {!live && (
-          <p className="text-yellow-300">
-            <span aria-hidden="true">⚠ </span>
-            Sem conexão em tempo real. Tentando reconectar...
-          </p>
-        )}
+    <div className="mb-3 flex flex-col gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <StatusLegend />
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onIdentify} className={ui.buttonGhost}>
+            <Hash aria-hidden="true" className="h-4 w-4" />
+            Identificar telas
+          </button>
+          {children}
+        </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onIdentify}
-          className="min-h-11 rounded-md border border-transparent px-3 text-xs text-foreground/60 hover:bg-accent/20 hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          <span aria-hidden="true"># </span>
-          Identificar telas
-        </button>
-        {children}
-      </div>
+      {!live && (
+        <Notice variant="warning">
+          Sem conexão em tempo real. Tentando reconectar...
+        </Notice>
+      )}
+      <p role="status" aria-live="polite" className="min-h-5 text-sm text-accent-soft">
+        {message}
+      </p>
     </div>
   );
 }
