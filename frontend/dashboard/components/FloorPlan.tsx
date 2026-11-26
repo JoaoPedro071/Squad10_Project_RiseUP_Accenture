@@ -1,9 +1,18 @@
 "use client";
 
+import {
+  Check,
+  Focus,
+  Lock,
+  LockOpen,
+  Move,
+  TriangleAlert,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { useBoard } from "@/hooks/useBoard";
 import { contentLabel } from "@/lib/content";
+import { ui } from "@/lib/ui";
 import type { Client, Experience, FocusState, Image } from "@/types/api";
 import BoardToolbar from "./BoardToolbar";
 import FocusBanner from "./FocusBanner";
@@ -190,20 +199,20 @@ export default function FloorPlan({
             type="button"
             onClick={() => setEditMode((current) => !current)}
             aria-pressed={editMode}
-            className={`min-h-11 rounded-md border px-3 text-xs hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent ${
-              editMode
-                ? "border-accent text-foreground"
-                : "border-transparent text-foreground/60 hover:text-foreground"
-            }`}
+            className={editMode ? ui.buttonPrimary : ui.buttonGhost}
           >
-            <span aria-hidden="true">{editMode ? "✓ " : "✎ "}</span>
+            {editMode ? (
+              <Check aria-hidden="true" className="h-4 w-4" />
+            ) : (
+              <Move aria-hidden="true" className="h-4 w-4" />
+            )}
             {editMode ? "Concluir edição" : "Editar posições"}
           </button>
         )}
       </BoardToolbar>
 
       {editMode && (
-        <p className="mb-2 text-xs text-foreground/60">
+        <p className="mb-2 text-xs text-muted">
           Arraste os monitores ou use as setas do teclado (Shift anda mais). A
           posição é salva ao soltar. Monitores travados não se movem, e o menu
           de opções só abre depois de concluir a edição.
@@ -214,8 +223,10 @@ export default function FloorPlan({
         ref={planRef}
         role="group"
         aria-label="Planta do escritório"
-        className={`relative min-h-72 w-full flex-1 rounded-lg border-2 border-white ${
-          editMode ? "bg-accent/5" : ""
+        className={`relative min-h-72 w-full flex-1 rounded-lg border ${
+          editMode
+            ? "border-dashed border-accent-light/60 bg-accent/5"
+            : "border-border bg-surface"
         }`}
       >
         {clients.map((client) => {
@@ -232,9 +243,11 @@ export default function FloorPlan({
                 top: `${position.y}%`,
                 width: CARD_WIDTH,
               }}
-              className={`absolute flex max-w-[40%] -translate-x-1/2 -translate-y-1/2 flex-col rounded-md border border-border bg-surface ${
-                dragging ? "z-10" : ""
-              }`}
+              className={`absolute flex max-w-[40%] -translate-x-1/2 -translate-y-1/2 flex-col rounded-md border bg-card ${
+                focus?.clientId === client.id
+                  ? "border-accent"
+                  : "border-border"
+              } ${dragging ? "z-10 shadow-lg shadow-accent/20" : ""}`}
             >
               <button
                 type="button"
@@ -245,7 +258,7 @@ export default function FloorPlan({
                 onPointerCancel={handlePointerCancel}
                 onKeyDown={(e) => handleKeyDown(e, client)}
                 aria-haspopup={editMode ? undefined : "dialog"}
-                className={`flex min-h-11 w-full flex-col items-start gap-1 rounded-md ${cardPadding} text-left focus-visible:outline-2 focus-visible:outline-accent ${
+                className={`interactive flex min-h-11 w-full flex-col items-start gap-1 rounded-md ${cardPadding} text-left hover:bg-accent/10 ${
                   draggable ? "cursor-grab touch-none select-none" : ""
                 }`}
               >
@@ -259,18 +272,22 @@ export default function FloorPlan({
                   )}
                 </span>
                 <span className={nameText}>{client.name}</span>
-                <span className={`${detailText} text-foreground/70`}>
+                <span className={`${detailText} text-muted`}>
                   {contentLabel(client, { experiences, images })}
                 </span>
                 {client.orientationMismatch && (
-                  <span className={`${detailText} text-orange-400`}>
-                    <span aria-hidden="true">⚠ </span>
+                  <span
+                    className={`${detailText} flex items-center gap-1 text-status-error`}
+                  >
+                    <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5" />
                     Orientação incorreta
                   </span>
                 )}
                 {focus?.clientId === client.id && (
-                  <span className={`${detailText} text-yellow-300`}>
-                    <span aria-hidden="true">◉ </span>
+                  <span
+                    className={`${detailText} flex items-center gap-1 text-accent-light`}
+                  >
+                    <Focus aria-hidden="true" className="h-3.5 w-3.5" />
                     Em foco
                   </span>
                 )}
@@ -281,11 +298,19 @@ export default function FloorPlan({
                   type="button"
                   onClick={() => setLockTargetId(client.id)}
                   disabled={board.busyId === client.id}
-                  className={`min-h-11 w-full rounded-b-md border-t border-border px-[clamp(0.5rem,0.8vw,1.1rem)] text-left ${detailText} hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50`}
+                  className={`interactive flex min-h-11 w-full items-center gap-1.5 rounded-b-md border-t border-border px-[clamp(0.5rem,0.8vw,1.1rem)] text-left ${detailText} hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  <span aria-hidden="true">
-                    {client.locked ? "🔒 " : "🔓 "}
-                  </span>
+                  {client.locked ? (
+                    <Lock
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 text-accent-light"
+                    />
+                  ) : (
+                    <LockOpen
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 text-muted"
+                    />
+                  )}
                   {client.locked ? "Travada" : "Livre"}
                   <span className="sr-only">
                     {" "}
