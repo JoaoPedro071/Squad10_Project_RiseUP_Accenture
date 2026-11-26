@@ -1,11 +1,15 @@
 "use client";
 
+import { Eye, EyeOff, Pencil, Star } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { mediaUrl } from "@/lib/config";
 import { orientationLabel } from "@/lib/orientation";
+import { ui } from "@/lib/ui";
 import { ApiError, setImageActive } from "@/services/api";
 import type { Image } from "@/types/api";
+import Notice from "./Notice";
 
 type ImageCardProps = {
   image: Image;
@@ -41,43 +45,39 @@ export default function ImageCard({
 
   return (
     <article
-      className={`flex flex-col rounded-lg border border-border bg-surface p-4 ${
-        image.active ? "" : "opacity-60"
-      }`}
+      className={`${ui.card} flex flex-col ${image.active ? "" : "opacity-60"}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={image.url}
+        src={mediaUrl(image.url)}
         alt=""
-        className="h-36 w-full rounded-md bg-black object-contain"
+        className="h-36 w-full rounded-md border border-border bg-black object-contain"
       />
       <div className="mt-3 flex items-start justify-between gap-2">
-        <h2 className="text-lg font-semibold">{image.title}</h2>
+        <h2 className="text-lg leading-tight font-bold">{image.title}</h2>
         <div className="flex flex-wrap justify-end gap-1">
           {isStandby && (
-            <span className="rounded-full border border-purple-300/50 px-2 py-1 text-xs text-purple-300">
+            <span className={`${ui.chipAccent} gap-1`}>
+              <Star aria-hidden="true" className="h-3 w-3" />
               Stand-by atual
             </span>
           )}
-          {!image.active && (
-            <span className="rounded-full border border-border px-2 py-1 text-xs">
-              Inativa
-            </span>
-          )}
+          {!image.active && <span className={ui.chip}>Inativa</span>}
         </div>
       </div>
       {image.description && (
         <p className="mt-2 text-sm text-foreground/80">{image.description}</p>
       )}
-      <p className="mt-3 text-xs text-foreground/60">
+      <p className="mt-3 text-xs text-muted">
         {orientationLabel[image.orientation]}
       </p>
       {canManage && (
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-auto flex flex-wrap gap-2 pt-4">
           <Link
             href={`/images/${image.id}/edit`}
-            className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
+            className={ui.buttonSecondary}
           >
+            <Pencil aria-hidden="true" className="h-4 w-4" />
             Editar
           </Link>
           <button
@@ -89,22 +89,26 @@ export default function ImageCard({
                 ? "Escolha outro stand-by antes de inativar."
                 : undefined
             }
-            className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+            className={ui.buttonSecondary}
           >
+            {image.active ? (
+              <EyeOff aria-hidden="true" className="h-4 w-4" />
+            ) : (
+              <Eye aria-hidden="true" className="h-4 w-4" />
+            )}
             {busy ? "Salvando..." : image.active ? "Inativar" : "Reativar"}
           </button>
         </div>
       )}
       {canManage && isStandby && image.active && (
-        <p className="mt-1 text-xs text-foreground/60">
+        <p className={ui.hint}>
           Para inativar, escolha outro stand-by em Configurações.
         </p>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-sm text-red-300">
-          <span aria-hidden="true">⚠ </span>
+        <Notice variant="error" className="mt-2">
           {error}
-        </p>
+        </Notice>
       )}
     </article>
   );

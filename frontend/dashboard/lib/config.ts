@@ -2,7 +2,8 @@
 // NEXT_PUBLIC_ = disponível também no navegador.
 
 /** Backend FastAPI. */
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 /** Mesmo backend, pelo WebSocket (http -> ws, https -> wss). */
 export const WS_URL = API_URL.replace(/^http/, "ws");
@@ -13,6 +14,14 @@ export const SESSION_COOKIE = "em_session";
 /** Player (client-app), usado nos links "abrir tela". */
 export const CLIENT_APP_URL =
   process.env.NEXT_PUBLIC_CLIENT_APP_URL ?? "http://localhost:3001";
+
+/** Endereço de uma imagem para mostrar no dashboard. Caminhos internos
+ * (ex.: /demo-image.svg) ficam no player, então apontam para ele. */
+export function mediaUrl(url: string): string {
+  return url.startsWith("/") && !url.startsWith("//")
+    ? `${CLIENT_APP_URL}${url}`
+    : url;
+}
 
 /** Endereço da página de login. next = página para voltar depois de entrar. */
 export function loginUrl(next?: string): string {

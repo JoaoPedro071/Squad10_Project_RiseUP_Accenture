@@ -1,7 +1,9 @@
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import ExperienceCard from "@/components/ExperienceCard";
 import { fetchExperiences, fetchState } from "@/services/api";
 import { canManage } from "@/lib/permissions";
+import { ui } from "@/lib/ui";
 import { currentUser, withSession } from "@/services/session";
 
 export const dynamic = "force-dynamic";
@@ -27,19 +29,19 @@ export default async function ExperiencesPage({
     state.clients.filter((c) => c.currentExperienceId === id).length;
 
   const tabClass = (selected: boolean) =>
-    `inline-flex min-h-11 items-center rounded-md px-4 text-sm focus-visible:outline-2 focus-visible:outline-accent ${
-      selected ? "bg-accent/30 font-medium" : "hover:bg-accent/20"
+    `interactive inline-flex min-h-11 items-center rounded-md px-4 text-sm ${
+      selected
+        ? "bg-accent/15 font-bold text-accent-light"
+        : "text-muted hover:bg-accent/10 hover:text-foreground"
     }`;
 
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Experiências</h1>
+        <h1 className="text-3xl font-bold">Experiências</h1>
         {manage && (
-          <Link
-            href="/experiences/new"
-            className="inline-flex min-h-11 items-center rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
+          <Link href="/experiences/new" className={ui.buttonPrimary}>
+            <Plus aria-hidden="true" className="h-4 w-4" />
             Nova experiência
           </Link>
         )}
@@ -61,7 +63,7 @@ export default async function ExperiencesPage({
         </Link>
       </nav>
       {shown.length === 0 ? (
-        <p>
+        <p className="text-muted">
           {showInactive
             ? "Nenhuma experiência inativa."
             : "Nenhuma experiência ativa."}
