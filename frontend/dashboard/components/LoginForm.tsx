@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { LogIn } from "lucide-react";
+import { inputClass, ui } from "@/lib/ui";
 import { ApiError, login } from "@/services/api";
-
-const inputClass =
-  "min-h-11 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-accent";
+import Notice from "./Notice";
 
 export default function LoginForm({ next }: { next: string }) {
   const router = useRouter();
@@ -40,7 +40,7 @@ export default function LoginForm({ next }: { next: string }) {
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
       <div>
-        <label htmlFor="login-email" className="mb-1 block text-sm font-medium">
+        <label htmlFor="login-email" className={ui.label}>
           E-mail
         </label>
         <input
@@ -49,11 +49,11 @@ export default function LoginForm({ next }: { next: string }) {
           autoComplete="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className={inputClass}
+          className={inputClass(!!error)}
         />
       </div>
       <div>
-        <label htmlFor="login-password" className="mb-1 block text-sm font-medium">
+        <label htmlFor="login-password" className={ui.label}>
           Senha
         </label>
         <input
@@ -62,20 +62,12 @@ export default function LoginForm({ next }: { next: string }) {
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className={inputClass}
+          className={inputClass(!!error)}
         />
       </div>
-      {error && (
-        <p role="alert" className="text-sm text-red-300">
-          <span aria-hidden="true">⚠ </span>
-          {error}
-        </p>
-      )}
-      <button
-        type="submit"
-        disabled={saving}
-        className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-      >
+      {error && <Notice variant="error">{error}</Notice>}
+      <button type="submit" disabled={saving} className={ui.buttonPrimary}>
+        <LogIn aria-hidden="true" className="h-4 w-4" />
         {saving ? "Entrando..." : "Entrar"}
       </button>
     </form>

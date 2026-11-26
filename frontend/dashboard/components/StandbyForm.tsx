@@ -1,12 +1,16 @@
 "use client";
 
+import { Check, Save, Square } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { mediaUrl } from "@/lib/config";
 import { orientationLabel } from "@/lib/orientation";
+import { ui } from "@/lib/ui";
 import { ApiError, setStandbyImage } from "@/services/api";
 import type { Image } from "@/types/api";
+import Notice from "./Notice";
 
 type StandbyFormProps = {
   images: Image[]; // só as ativas
@@ -15,43 +19,66 @@ type StandbyFormProps = {
 
 const NONE = "none"; // opção "sem imagem" (tela preta)
 
-export default function StandbyForm({ images, initialStandbyId }: StandbyFormProps) {
+type Result = { variant: "success" | "error"; text: string } | null;
+
+export default function StandbyForm({
+  images,
+  initialStandbyId,
+}: StandbyFormProps) {
   const router = useRouter();
   const [savedId, setSavedId] = useState(initialStandbyId ?? NONE);
   const [selectedId, setSelectedId] = useState(initialStandbyId ?? NONE);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [result, setResult] = useState<Result>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setMessage("Salvando...");
+    setResult(null);
     try {
-      const settings = await setStandbyImage(selectedId === NONE ? null : selectedId);
+      const settings = await setStandbyImage(
+        selectedId === NONE ? null : selectedId,
+      );
       setSavedId(settings.standbyImageId ?? NONE);
-      setMessage("Concluído. As telas sem conteúdo atualizam em instantes.");
+      setResult({
+        variant: "success",
+        text: "Concluído. As telas sem conteúdo já exibem o novo stand-by.",
+      });
       router.refresh();
     } catch (error) {
-      setMessage(
-        error instanceof ApiError ? error.message : "Não foi possível salvar. Tente novamente.",
-      );
+      setResult({
+        variant: "error",
+        text:
+          error instanceof ApiError
+            ? error.message
+            : "Não foi possível salvar. Tente novamente.",
+      });
     } finally {
       setSaving(false);
     }
   }
 
   const optionClass =
-    "flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-border p-3 hover:bg-accent/20 has-checked:border-accent";
+    "interactive flex min-h-14 cursor-pointer items-center gap-3 rounded-md border border-border bg-surface p-3 hover:border-accent-light/60 has-[:checked]:border-accent has-[:checked]:bg-accent/15";
+
+  const current = (id: string) =>
+    id === savedId && (
+      <span className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-accent-light">
+        <Check aria-hidden="true" className="h-4 w-4" />
+        Atual
+      </span>
+    );
 
   return (
     <form onSubmit={handleSubmit} className="flex max-w-xl flex-col gap-4">
-      <fieldset>
-        <legend className="text-lg font-semibold">Imagem de stand-by</legend>
-        <p className="mt-1 text-sm text-foreground/70">
+      <fieldset className={ui.card}>
+        <legend className="sr-only">Imagem de stand-by</legend>
+        <h2 className="text-lg font-bold">Imagem de stand-by</h2>
+        <p className="mt-1 text-sm text-muted">
           Exibida pelas telas ligadas que estão sem conteúdo.
         </p>
 
-        <div className="mt-3 flex flex-col gap-2">
+        <div className="mt-4 flex flex-col gap-2">
           <label className={optionClass}>
             <input
               type="radio"
@@ -59,11 +86,16 @@ export default function StandbyForm({ images, initialStandbyId }: StandbyFormPro
               value={NONE}
               checked={selectedId === NONE}
               onChange={() => setSelectedId(NONE)}
+              className="h-4 w-4 accent-accent"
             />
-            <span>
-              <span className="block font-medium">Nenhuma</span>
-              <span className="block text-xs text-foreground/60">Tela preta</span>
+            <span className="flex h-12 w-20 shrink-0 items-center justify-center rounded-md border border-border bg-black text-muted">
+              <Square aria-hidden="true" className="h-4 w-4" />
             </span>
+            <span>
+              <span className="block font-bold">Nenhuma</span>
+              <span className="block text-xs text-muted">Tela preta</span>
+            </span>
+            {current(NONE)}
           </label>
 
           {images.map((image) => (
@@ -74,51 +106,50 @@ export default function StandbyForm({ images, initialStandbyId }: StandbyFormPro
                 value={image.id}
                 checked={selectedId === image.id}
                 onChange={() => setSelectedId(image.id)}
+                className="h-4 w-4 accent-accent"
               />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={image.url}
+                src={mediaUrl(image.url)}
                 alt=""
-                className="h-12 w-20 shrink-0 rounded bg-black object-contain"
+                className="h-12 w-20 shrink-0 rounded-md border border-border bg-black object-contain"
               />
               <span>
-                <span className="block font-medium">
-                  {image.title}
-                  {image.id === savedId && " (atual)"}
-                </span>
-                <span className="block text-xs text-foreground/60">
+                <span className="block font-bold">{image.title}</span>
+                <span className="block text-xs text-muted">
                   {orientationLabel[image.orientation]}
                 </span>
               </span>
+              {current(image.id)}
             </label>
           ))}
         </div>
 
         {images.length === 0 && (
-          <p className="mt-3 text-sm text-foreground/70">
+          <p className="mt-3 text-sm text-muted">
             Nenhuma imagem ativa.{" "}
-            <Link href="/images/new" className="text-purple-300 underline">
+            <Link href="/images/new" className="text-accent-light underline">
               Cadastre uma imagem
             </Link>{" "}
             para usar como stand-by.
           </p>
         )}
-        <p className="mt-3 text-xs text-foreground/60">
-          Dica: prefira uma imagem com orientação &quot;Qualquer orientação&quot;,
-          pois ela aparece em telas na horizontal e na vertical.
+        <p className={`${ui.hint} mt-3`}>
+          Dica: prefira uma imagem com orientação &quot;Qualquer
+          orientação&quot;, pois ela aparece em telas na horizontal e na
+          vertical.
         </p>
       </fieldset>
 
-      <p role="status" aria-live="polite" className="min-h-6 text-sm text-foreground/80">
-        {message}
-      </p>
+      {result && <Notice variant={result.variant}>{result.text}</Notice>}
 
       <div>
         <button
           type="submit"
           disabled={saving || selectedId === savedId}
-          className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+          className={ui.buttonPrimary}
         >
+          <Save aria-hidden="true" className="h-4 w-4" />
           {saving ? "Salvando..." : "Salvar"}
         </button>
       </div>
