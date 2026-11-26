@@ -1,6 +1,7 @@
 // Linha de avisos da planta e da lista: mensagem da última ação, aviso de
 // conexão em tempo real e o botão "Identificar telas".
 import type { ReactNode } from "react";
+import StatusLegend from "./StatusLegend";
 
 type BoardToolbarProps = {
   message: string;
@@ -9,10 +10,16 @@ type BoardToolbarProps = {
   children?: ReactNode; // botões extras (ex.: "Editar posições" na planta)
 };
 
-export default function BoardToolbar({ message, live, onIdentify, children }: BoardToolbarProps) {
+export default function BoardToolbar({
+  message,
+  live,
+  onIdentify,
+  children,
+}: BoardToolbarProps) {
   return (
     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
       <div className="min-h-6 text-xs text-foreground/60">
+        <StatusLegend className="mb-1" />
         <p role="status" aria-live="polite">
           {message}
         </p>
