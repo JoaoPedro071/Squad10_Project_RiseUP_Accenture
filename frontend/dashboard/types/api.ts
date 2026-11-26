@@ -60,6 +60,17 @@ export type FocusResponse = { focus: FocusState | null; clients: Client[] };
 
 export type Settings = { standbyImageId: string | null };
 
+/** Perfis: Coordenação pode tudo; Apoio opera as telas (sem catálogo, configurações e posições). */
+export type UserRole = "coordination" | "support";
+
+export type User = {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  active: boolean;
+};
+
 /** Mensagens que o backend envia pelo WebSocket do dashboard. */
 export type DashboardMessage =
   | { type: "state"; focus: FocusState | null; clients: Client[] }

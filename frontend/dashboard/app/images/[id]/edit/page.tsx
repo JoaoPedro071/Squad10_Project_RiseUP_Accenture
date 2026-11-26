@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import ImageForm from "@/components/ImageForm";
 import { fetchImages } from "@/services/api";
+import { withSession } from "@/services/session";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,8 @@ type EditImagePageProps = {
 
 export default async function EditImagePage({ params }: EditImagePageProps) {
   const { id } = await params;
-  const image = (await fetchImages()).find((i) => i.id === id);
+  const images = await withSession((cookie) => fetchImages(cookie));
+  const image = images.find((i) => i.id === id);
   if (!image) notFound();
 
   return (

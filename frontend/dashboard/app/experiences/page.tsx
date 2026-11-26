@@ -1,6 +1,7 @@
 import Link from "next/link";
 import ExperienceCard from "@/components/ExperienceCard";
 import { fetchExperiences, fetchState } from "@/services/api";
+import { withSession } from "@/services/session";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,9 @@ type ExperiencesPageProps = {
 export default async function ExperiencesPage({ searchParams }: ExperiencesPageProps) {
   const { status } = await searchParams;
   const showInactive = status === "inactive";
-  const [experiences, state] = await Promise.all([fetchExperiences(), fetchState()]);
+  const [experiences, state] = await withSession((cookie) =>
+    Promise.all([fetchExperiences(cookie), fetchState(cookie)]),
+  );
 
   const active = experiences.filter((e) => e.active);
   const inactive = experiences.filter((e) => !e.active);

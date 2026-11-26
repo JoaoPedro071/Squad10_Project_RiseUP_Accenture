@@ -1,11 +1,14 @@
 import Link from "next/link";
 import ImageCard from "@/components/ImageCard";
 import { fetchImages, fetchSettings } from "@/services/api";
+import { withSession } from "@/services/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function ImagesPage() {
-  const [images, settings] = await Promise.all([fetchImages(), fetchSettings()]);
+  const [images, settings] = await withSession((cookie) =>
+    Promise.all([fetchImages(cookie), fetchSettings(cookie)]),
+  );
 
   return (
     <section>

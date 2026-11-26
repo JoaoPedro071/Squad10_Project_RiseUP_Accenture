@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { WS_URL } from "@/lib/config";
+import { loginUrl, WS_URL } from "@/lib/config";
 import {
   ApiError,
   endFocus,
@@ -98,8 +98,13 @@ export function useBoard(initialClients: Client[], initialFocus: FocusState | nu
           numbersTimer = setTimeout(() => setNumbers(null), data.seconds * 1000);
         }
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (stopped) return;
+        if (event.code === 4401) {
+          // Sessão expirou: volta para o login.
+          window.location.assign(loginUrl(window.location.pathname));
+          return;
+        }
         setLive(false);
         retryTimer = setTimeout(connect, retryMs);
         retryMs = Math.min(retryMs * 2, MAX_RETRY_MS);
