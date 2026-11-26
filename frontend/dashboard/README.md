@@ -1,10 +1,10 @@
 # Dashboard: Experience Manager
 
-Painel do operador (Next.js, porta 3000). Lê e altera tudo pelo backend FastAPI.
+Painel do operador (Next.js, porta 3000). Lê e altera tudo pelo backend FastAPI. Exige login.
 
 ## Rodar
 
-Com o backend rodando (`backend/`, porta 8000):
+Com o backend rodando (`backend/`, porta 8000) e um usuário criado (`uv run python manage.py create-user ...` no `backend/`):
 
 ```bash
 cp .env.example .env.local      # Windows (PowerShell): Copy-Item .env.example .env.local
@@ -19,15 +19,24 @@ npm run dev                     # http://localhost:3000
 
 Se o dashboard for aberto por outro endereço, inclua-o em `CORS_ORIGINS` no backend.
 
+## Login e perfis
+
+- Sem sessão, qualquer página leva a `/login` (`proxy.ts`) e, depois de entrar, volta para a página pedida.
+- O backend grava um cookie `HttpOnly`; o dashboard nunca lê o token. As páginas do servidor repassam o cookie ao backend (`services/session.ts`), e as chamadas do navegador usam `credentials: "include"`.
+- Sessão expirada no meio do uso (401 ou WebSocket fechado com 4401): volta para o login.
+- O menu mostra o nome, o perfil e **Sair**.
+- **Apoio** não vê Configurações, Editar posições, Nova experiência/imagem nem Editar/Inativar; se abrir essas páginas pelo endereço, vê "Sem permissão". O backend recusa de qualquer forma (403).
+
 ## Páginas
 
 | Rota | O que faz |
 |---|---|
+| `/login` | Entrar (e-mail e senha) |
 | `/` | Planta: status das telas, troca de conteúdo, Modo foco, mover e travar posição |
 | `/clients` | As mesmas telas em lista |
 | `/experiences`, `/experiences/new`, `/experiences/[id]/edit` | Catálogo de experiências: filtro Ativas/Inativas, setores e tags, editar (com confirmação se estiver em uso) e inativar |
 | `/images`, `/images/new`, `/images/[id]/edit` | Catálogo de imagens: cadastrar (sugere a orientação pela proporção), editar e inativar |
-| `/settings` | Imagem de stand-by |
+| `/settings` | Imagem de stand-by (só Coordenação) |
 
 Planta e lista recebem as mudanças em tempo real (WebSocket `/ws/dashboard`). Sem conexão, aparece "Sem conexão em tempo real" e o dashboard tenta reconectar sozinho. Ao trocar o conteúdo de uma tela, "Concluído" só aparece quando a tela confirma; sem confirmação em 5 s, um aviso pede para conferir a tela. O botão "Identificar telas" mostra o número de cada tela por 10 s. Com o backend fora do ar ao abrir a página, aparece uma tela de erro com "Tentar novamente".
 
@@ -38,7 +47,9 @@ app/            páginas (carregam os dados do backend no servidor)
 components/     telas e modais
 hooks/useBoard  estado e ações das telas (planta e lista) e conexão WebSocket
 services/api.ts todas as chamadas ao backend
-lib/            config, rótulos de status e orientação, validação dos formulários
+services/session.ts  sessão nas páginas do servidor (cookie, usuário logado)
+proxy.ts        manda para o login quem não tem sessão
+lib/            config, permissões, rótulos de status e orientação, validação dos formulários
 types/api.ts    contrato do backend
 ```
 
