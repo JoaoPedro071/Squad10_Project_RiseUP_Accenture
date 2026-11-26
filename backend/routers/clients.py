@@ -3,6 +3,7 @@ import re
 
 from fastapi import APIRouter, Response
 
+from dependencies import COORDINATION, LOGGED
 from errors import ApiError
 from models.store import store
 from schemas.client import (
@@ -31,12 +32,12 @@ def _is_percent(value: object) -> bool:
     )
 
 
-@router.get("", response_model=list[Client])
+@router.get("", response_model=list[Client], dependencies=LOGGED)
 async def list_clients():
     return store.list_clients()
 
 
-@router.post("/identify")
+@router.post("/identify", dependencies=LOGGED)
 async def identify_screens():
     """Modo de identificacao: cada tela conectada mostra numero e nome
     por alguns segundos. Devolve o numero de cada tela."""
@@ -73,7 +74,7 @@ async def heartbeat(client_id: str, payload: HeartbeatUpdate):
     return Response(status_code=204)
 
 
-@router.put("/{client_id}/content", response_model=Client)
+@router.put("/{client_id}/content", response_model=Client, dependencies=LOGGED)
 async def set_content(client_id: str, payload: ContentUpdate):
     """Define o que a tela exibe: experiencia, imagem ou nada.
 
@@ -135,7 +136,7 @@ async def set_content(client_id: str, payload: ContentUpdate):
     )
 
 
-@router.put("/{client_id}/position", response_model=Client)
+@router.put("/{client_id}/position", response_model=Client, dependencies=COORDINATION)
 async def move_client(client_id: str, payload: PositionUpdate):
     if not _is_percent(payload.x) or not _is_percent(payload.y):
         raise ApiError(422, "Posição inválida")
@@ -147,7 +148,7 @@ async def move_client(client_id: str, payload: PositionUpdate):
     return store.update_client(client_id, x=payload.x, y=payload.y)
 
 
-@router.put("/{client_id}/lock", response_model=Client)
+@router.put("/{client_id}/lock", response_model=Client, dependencies=COORDINATION)
 async def lock_client(client_id: str, payload: LockUpdate):
     if not isinstance(payload.locked, bool):
         raise ApiError(422, "Campo locked inválido")

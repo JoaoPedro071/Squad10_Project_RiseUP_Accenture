@@ -1,11 +1,12 @@
 from fastapi import APIRouter
 
+from dependencies import COORDINATION, LOGGED
 from errors import ApiError, FieldValidationError
 from models.store import store
 from schemas.image import Image, ImageActiveUpdate, ImageCreate
 from services.validation import validate_image
 
-router = APIRouter(prefix="/api/images", tags=["images"])
+router = APIRouter(prefix="/api/images", tags=["images"], dependencies=LOGGED)
 
 
 @router.get("", response_model=list[Image])
@@ -14,7 +15,7 @@ async def list_images():
     return store.list_images()
 
 
-@router.post("", response_model=Image, status_code=201)
+@router.post("", response_model=Image, status_code=201, dependencies=COORDINATION)
 async def create_image(payload: ImageCreate):
     data = payload.model_dump()
     field_errors = validate_image(data)
@@ -23,7 +24,7 @@ async def create_image(payload: ImageCreate):
     return store.create_image(data)
 
 
-@router.put("/{image_id}", response_model=Image)
+@router.put("/{image_id}", response_model=Image, dependencies=COORDINATION)
 async def update_image(image_id: str, payload: ImageCreate):
     """Edita todos os campos (mesmas regras do cadastro)."""
     if store.find_image(image_id) is None:
@@ -35,7 +36,7 @@ async def update_image(image_id: str, payload: ImageCreate):
     return store.update_image(image_id, data)
 
 
-@router.put("/{image_id}/active", response_model=Image)
+@router.put("/{image_id}/active", response_model=Image, dependencies=COORDINATION)
 async def set_image_active(image_id: str, payload: ImageActiveUpdate):
     """Inativa ou reativa. Inativar nao apaga: a imagem some das opcoes de
     atribuicao, mas uma tela que ja a exibe continua ate ser trocada."""

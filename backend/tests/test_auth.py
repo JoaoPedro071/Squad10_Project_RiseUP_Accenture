@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from main import app
 from models.store import store
@@ -20,6 +21,8 @@ from services.auth import (
 @pytest.fixture(autouse=True)
 def fresh_store():
     store.reset()
+    # Aqui o login e testado de verdade: desliga o usuario falso do conftest.py.
+    app.dependency_overrides.clear()
 
 
 def test_password_is_hashed_and_verified():
@@ -121,3 +124,77 @@ def test_logout_ends_session_immediately(tc):
     # O token antigo nao vale mais, mesmo se alguem o guardou.
     tc.cookies.set("em_session", token)
     assert tc.get("/api/auth/me").status_code == 401
+
+
+# ---------- o que cada perfil pode fazer ----------
+
+def login_as(tc, role):
+    email = f"{role}@exemplo.com"
+    store.create_user(email, role, hash_password("senha-forte-123"), role)
+    assert tc.post("/api/auth/login", json={**LOGIN, "email": email}).status_code == 200
+
+
+def test_dashboard_routes_require_login(tc):
+    for method, path in [
+        ("get", "/api/clients"),
+        ("get", "/api/experiences"),
+        ("get", "/api/images"),
+        ("get", "/api/settings"),
+        ("get", "/api/focus"),
+        ("put", "/api/clients/cli-2/content"),
+        ("post", "/api/clients/identify"),
+        ("put", "/api/experiences/exp-1/active"),
+    ]:
+        r = getattr(tc, method)(path, **({} if method == "get" else {"json": {}}))
+        assert r.status_code == 401, (method, path)
+
+
+def test_player_routes_stay_open(tc):
+    assert tc.get("/api/clients/cli-1/display").status_code == 200
+    r = tc.post("/api/clients/cli-1/heartbeat", json={"orientation": "landscape"})
+    assert r.status_code == 204
+    assert tc.get("/api/health").status_code == 200
+
+
+def test_support_can_operate_screens(tc):
+    login_as(tc, "support")
+    assert tc.get("/api/experiences").status_code == 200
+    r = tc.put("/api/clients/cli-2/content", json={"experienceId": "exp-3"})
+    assert r.status_code == 200
+    assert tc.post("/api/clients/identify").status_code == 200
+    assert tc.post("/api/focus", json={"clientId": "cli-1"}).status_code == 201
+    assert tc.delete("/api/focus").status_code == 200
+
+
+def test_support_cannot_change_catalog_settings_or_positions(tc):
+    login_as(tc, "support")
+    forbidden = {"error": "Seu perfil não permite esta ação."}
+    for method, path, body in [
+        ("put", "/api/experiences/exp-1/active", {"active": False}),
+        ("post", "/api/images", {}),
+        ("put", "/api/settings", {"standbyImageId": None}),
+        ("put", "/api/clients/cli-4/position", {"x": 10, "y": 10}),
+        ("put", "/api/clients/cli-4/lock", {"locked": True}),
+    ]:
+        r = getattr(tc, method)(path, json=body)
+        assert r.status_code == 403 and r.json() == forbidden, (method, path)
+
+
+def test_coordination_can_change_catalog(tc):
+    login_as(tc, "coordination")
+    r = tc.put("/api/experiences/exp-1/active", json={"active": False})
+    assert r.status_code == 200
+
+
+def test_dashboard_socket_requires_login(tc):
+    with pytest.raises(WebSocketDisconnect) as closed:
+        with tc.websocket_connect("/ws/dashboard") as ws:
+            ws.receive_json()
+    assert closed.value.code == 4401
+
+
+def test_dashboard_socket_with_session(tc):
+    tc.post("/api/auth/login", json=LOGIN)
+    cookie = f"em_session={tc.cookies.get('em_session')}"
+    with tc.websocket_connect("/ws/dashboard", headers={"cookie": cookie}) as ws:
+        assert ws.receive_json()["type"] == "state"
