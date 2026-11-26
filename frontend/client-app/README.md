@@ -26,6 +26,7 @@ Cada tela abre o player com o seu id: `http://<player>/?client=<id da tela>`. Em
 - Modo de identificação: mostra o número e o nome da tela por cima do conteúdo por 10 s.
 - Sem conexão, mantém o que está na tela, mostra "Reconectando..." no canto e tenta de novo com espera crescente (1 s até 30 s). Avisos próprios: "Conectando...", "Tela não identificada" (sem `?client=`) e "Tela não cadastrada" (id desconhecido).
 - Sem elementos interativos e sem cursor.
+- Visual da marca Accenture: fundo preto, símbolo ">" oficial nas telas de aviso e Arial (para trocar pela Graphik, mude só `--font-brand` em `app/globals.css`). Animações desligadas para quem prefere menos movimento.
 
 ## Verificar
 

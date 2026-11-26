@@ -100,10 +100,11 @@ Todas as rotas do dashboard exigem login; catálogo, stand-by e posições exige
 - [x] Catálogo completo: editar e inativar experiências, setores e tags, editar imagens
 - [x] Tempo real com WebSocket, confirmação de recebimento e modo de identificação
 - [x] Login no dashboard com perfis Coordenação e Apoio
+- [x] Marca Accenture no dashboard e no player (cores, Arial, ícones lucide, símbolo ">")
 - [ ] Pareamento das telas (código e token por tela)
-- [ ] Deploy na AWS com custo zero
+- [ ] Planta real do espaço (aguardando o design)
 - [ ] Assistente de IA com confirmação do usuário
-- [ ] Telas reais: planta do espaço e design system da Accenture
+- [ ] Deploy na AWS com custo zero
 
 ## Decisões de projeto
 

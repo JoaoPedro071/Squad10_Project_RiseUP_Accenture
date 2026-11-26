@@ -1,6 +1,6 @@
 # Backend: Experience Manager API (FastAPI)
 
-API que guarda o estado das telas e do catálogo, valida cada ação e informa a cada tela (player) o que exibir. Os dados ficam em um banco (SQLite por padrão) e o sinal de vida fica em memória. Rode com um único worker.
+API que guarda o estado das telas e do catálogo, valida cada ação e informa a cada tela (player) o que exibir. Os dados ficam em um banco (SQLite por padrão) e o sinal de vida fica em memória. O dashboard usa login com dois perfis. Rode com um único worker.
 
 ## Rodar
 
@@ -8,8 +8,9 @@ Requer o [uv](https://docs.astral.sh/uv/). Ele usa o Python 3.12 (`.python-versi
 
 ```bash
 uv sync                                         # cria o .venv e instala tudo
+uv run python manage.py create-user --email voce@exemplo.com --name "Seu Nome" --role coordination
 uv run uvicorn main:app --reload --port 8000
-uv run pytest                                   # 101 testes
+uv run pytest                                   # 119 testes
 ```
 
 Dependências: `uv add <pacote>` (app) ou `uv add --dev <pacote>` (só desenvolvimento). Sempre commite o `pyproject.toml` junto com o `uv.lock`.
@@ -28,16 +29,29 @@ Copie `env.example` para `.env` (o `.env` nunca deve ser commitado).
 | `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3001` | Sites (dashboard e player) que podem chamar a API. `*` libera tudo e é **recusado** em `production` |
 | `HEARTBEAT_TIMEOUT_SECONDS` | `15` | Segundos sem sinal de vida até a tela ficar *Desligada* |
 | `DATABASE_URL` | `sqlite:///./experience-manager.db` | Banco de dados. Para Postgres, basta trocar a URL |
+| `SESSION_HOURS` | `12` | Horas até a sessão de login expirar |
+| `COOKIE_SECURE` | `false` | `true` = cookie de sessão só por HTTPS (sempre ligado em `production`) |
 
 Se o front for aberto por outro endereço (IP da máquina, outra porta), acrescente-o em `CORS_ORIGINS`.
 
 ### Banco de dados
 
 - Na primeira vez que a API sobe, ela cria o arquivo `experience-manager.db` (fora do Git) e grava os dados iniciais. Nas próximas vezes, mantém o que já existe.
-- **No banco:** experiências, imagens, telas (posição, trava e conteúdo), stand-by e Modo foco.
+- **No banco:** experiências, imagens, telas (posição, trava e conteúdo), stand-by, Modo foco, usuários e sessões de login.
 - **Em memória:** o sinal de vida. Ao reiniciar a API, as telas aparecem *Desligadas* até o próximo aviso (em até 5 s) e voltam ao mesmo conteúdo.
 - **Voltar aos dados iniciais:** pare a API, apague `experience-manager.db` e suba de novo.
 - Os testes usam um banco em memória e não mexem nesse arquivo.
+
+## Login e perfis
+
+- **Usuários:** criados pelo terminal, não há cadastro aberto:
+  `uv run python manage.py create-user --email ana@exemplo.com --name "Ana" --role coordination`
+  (a senha é pedida duas vezes, sem aparecer; mínimo de 8 caracteres).
+- **Perfis:** `coordination` (Coordenação) pode tudo. `support` (Apoio) vê tudo, troca conteúdo, usa o Modo foco e identifica telas, mas não mexe no catálogo, no stand-by nem nas posições (recebe 403).
+- **Sessão:** o login devolve um cookie `em_session` (`HttpOnly`, `SameSite=Lax`, `Secure` em produção) que vale `SESSION_HOURS`. No banco fica só o hash do token; "Sair" apaga a sessão na hora.
+- **Senhas:** guardadas com hash argon2. A mensagem de erro é a mesma para e-mail inexistente e senha errada; depois de 5 tentativas erradas em 1 minuto, responde 429.
+- **Rotas abertas:** player (`GET /display`, `POST /heartbeat`, `/ws/player`), `GET /api/health` e o próprio login. Elas passam a exigir o token da tela no pareamento.
+- **Deploy:** o dashboard (servidor Next) repassa o cookie ao backend, então os dois precisam do mesmo domínio-base (ex.: `app.exemplo.com` e `api.exemplo.com`); isso será configurado na trilha de deploy.
 
 ## Conceitos
 
@@ -62,7 +76,7 @@ Se o front for aberto por outro endereço (IP da máquina, outra porta), acresce
 | 2 | `paused` | Em pausa | Modo foco ativo e esta não é a tela em foco |
 | 3 | `error` | Erro | Orientação da tela ≠ orientação do conteúdo exibido |
 | 4 | `busy` | Em uso | Exibe uma experiência ou imagem |
-| 5 | `standby` | Stand-by | Ligada, sem conteúdo |
+| 5 | `standby` | Disponível | Ligada, sem conteúdo (exibe a imagem de stand-by) |
 
 Conteúdo com orientação `any` e o stand-by nunca geram erro de orientação.
 
@@ -76,29 +90,34 @@ Conteúdo com orientação `any` e o stand-by nunca geram erro de orientação.
 
 ## Contrato (JSON em camelCase)
 
-| Rota | Quem chama | Corpo | Sucesso | Erros |
+Quem pode: **Login** = qualquer pessoa logada; **Coord.** = só Coordenação; **Aberta** = sem login. Sem sessão: 401 `{"error": "Faça login para continuar."}`; perfil sem permissão: 403 `{"error": "Seu perfil não permite esta ação."}`.
+
+| Rota | Quem pode | Corpo | Sucesso | Erros |
 |---|---|---|---|---|
-| `GET /api/experiences` | Dashboard | n/a | `Experience[]` | n/a |
-| `POST /api/experiences` | Dashboard | title, description, url, type, orientation, sectors, tags | 201 `Experience` | 400 `{fieldErrors}` |
-| `PUT /api/experiences/{id}` | Dashboard | mesmos campos do cadastro | `Experience` | 400 `{fieldErrors}`, 404 |
-| `PUT /api/experiences/{id}/active` | Dashboard | `{active: bool}` | `Experience` | 422, 404 |
-| `GET /api/images` | Dashboard | n/a | `Image[]` | n/a |
-| `POST /api/images` | Dashboard | title, description, url, orientation | 201 `Image` | 400 `{fieldErrors}` |
-| `PUT /api/images/{id}` | Dashboard | mesmos campos do cadastro | `Image` | 400 `{fieldErrors}`, 404 |
-| `PUT /api/images/{id}/active` | Dashboard | `{active: bool}` | `Image` | 422, 404, 409 (é o stand-by atual) |
-| `GET /api/settings` | Dashboard | n/a | `{standbyImageId}` | n/a |
-| `PUT /api/settings` | Dashboard | `{standbyImageId: id \| null}` | `{standbyImageId}` | 422 (imagem inexistente ou inativa) |
-| `GET /api/clients` | Dashboard | n/a | `Client[]` | n/a |
-| `PUT /api/clients/{id}/content` | Dashboard | `{experienceId?, imgId?, displayImg?}` | `Client` | 422, 404 |
-| `PUT /api/clients/{id}/position` | Dashboard | `{x, y}` em % (0 a 100) | `Client` | 422, 403 (tela travada), 404 |
-| `PUT /api/clients/{id}/lock` | Dashboard | `{locked: bool}` | `Client` | 422, 404 |
-| `GET /api/focus` | Dashboard | n/a | `{focus, clients}` | n/a |
-| `POST /api/focus` | Dashboard | `{clientId}` | 201 `{focus, clients}` | 404, 422 (tela desligada), 409 (já ativo) |
-| `DELETE /api/focus` | Dashboard | n/a | `{focus: null, clients}` | n/a |
-| `POST /api/clients/identify` | Dashboard | n/a | `{seconds, numbers}` | n/a |
-| `POST /api/clients/{id}/heartbeat` | Testes e depuração (o player usa o WebSocket) | `{orientation, resolution?}` | 204 | 422, 404 |
-| `GET /api/clients/{id}/display` | Testes e depuração (o player usa o WebSocket) | n/a | `DisplayState` (`no-store`) | 404 |
-| `GET /api/health` | Monitoramento | n/a | `{status: "ok"}` | n/a |
+| `POST /api/auth/login` | Aberta | `{email, password}` | `User` + cookie | 401, 422, 429 |
+| `POST /api/auth/logout` | Aberta | n/a | 204 | n/a |
+| `GET /api/auth/me` | Login | n/a | `User` | 401 |
+| `GET /api/experiences` | Login | n/a | `Experience[]` | n/a |
+| `POST /api/experiences` | Coord. | title, description, url, type, orientation, sectors, tags | 201 `Experience` | 400 `{fieldErrors}` |
+| `PUT /api/experiences/{id}` | Coord. | mesmos campos do cadastro | `Experience` | 400 `{fieldErrors}`, 404 |
+| `PUT /api/experiences/{id}/active` | Coord. | `{active: bool}` | `Experience` | 422, 404 |
+| `GET /api/images` | Login | n/a | `Image[]` | n/a |
+| `POST /api/images` | Coord. | title, description, url, orientation | 201 `Image` | 400 `{fieldErrors}` |
+| `PUT /api/images/{id}` | Coord. | mesmos campos do cadastro | `Image` | 400 `{fieldErrors}`, 404 |
+| `PUT /api/images/{id}/active` | Coord. | `{active: bool}` | `Image` | 422, 404, 409 (é o stand-by atual) |
+| `GET /api/settings` | Login | n/a | `{standbyImageId}` | n/a |
+| `PUT /api/settings` | Coord. | `{standbyImageId: id \| null}` | `{standbyImageId}` | 422 (imagem inexistente ou inativa) |
+| `GET /api/clients` | Login | n/a | `Client[]` | n/a |
+| `PUT /api/clients/{id}/content` | Login | `{experienceId?, imgId?, displayImg?}` | `Client` | 422, 404 |
+| `PUT /api/clients/{id}/position` | Coord. | `{x, y}` em % (0 a 100) | `Client` | 422, 403 (tela travada), 404 |
+| `PUT /api/clients/{id}/lock` | Coord. | `{locked: bool}` | `Client` | 422, 404 |
+| `GET /api/focus` | Login | n/a | `{focus, clients}` | n/a |
+| `POST /api/focus` | Login | `{clientId}` | 201 `{focus, clients}` | 404, 422 (tela desligada), 409 (já ativo) |
+| `DELETE /api/focus` | Login | n/a | `{focus: null, clients}` | n/a |
+| `POST /api/clients/identify` | Login | n/a | `{seconds, numbers}` | n/a |
+| `POST /api/clients/{id}/heartbeat` | Aberta (o player usa o WebSocket) | `{orientation, resolution?}` | 204 | 422, 404 |
+| `GET /api/clients/{id}/display` | Aberta (o player usa o WebSocket) | n/a | `DisplayState` (`no-store`) | 404 |
+| `GET /api/health` | Aberta | n/a | `{status: "ok"}` | n/a |
 
 Formatos de erro: validação de cadastro devolve 400 `{"fieldErrors": {campo: mensagem}}`; os demais devolvem `{"error": "mensagem"}`, sempre em português.
 
@@ -138,8 +157,8 @@ Carregando, falha ao carregar o conteúdo e sem conexão são estados **locais**
 
 | Rota | Quem conecta | Recebe ao conectar e a cada mudança |
 |---|---|---|
-| `/ws/player/{clientId}` | Player | `{"type": "display", "version": n, "state": DisplayState}` (tela desconhecida: fecha com código 4404) |
-| `/ws/dashboard` | Dashboard | `{"type": "state", "focus", "clients"}` |
+| `/ws/player/{clientId}` | Player (aberta) | `{"type": "display", "version": n, "state": DisplayState}` (tela desconhecida: fecha com código 4404) |
+| `/ws/dashboard` | Dashboard (com login; sem sessão fecha com 4401) | `{"type": "state", "focus", "clients"}` |
 
 O player envia pelo mesmo canal:
 
@@ -213,7 +232,7 @@ export type FocusState = { clientId: string };
 export type Settings = { standbyImageId: string | null };
 ```
 
-Rótulos sugeridos para a interface: `busy` Em uso · `standby` Stand-by · `paused` Em pausa · `error` Erro · `off` Desligada (sempre com ícone e texto, nunca só cor).
+Rótulos usados na interface: `busy` Em uso · `standby` Disponível · `paused` Em pausa · `error` Erro · `off` Desligada (sempre com ícone e texto, nunca só cor).
 
 ## Estrutura
 
@@ -221,13 +240,15 @@ Rótulos sugeridos para a interface: `busy` Em uso · `standby` Stand-by · `pau
 pyproject.toml     dependências (uv) e configuração do pytest
 uv.lock            versões exatas das dependências (gerado pelo uv)
 main.py            app, CORS, routers e aviso em tempo real após cada alteração
-config.py          variáveis de ambiente (APP_ENV, CORS_ORIGINS, HEARTBEAT_TIMEOUT_SECONDS, DATABASE_URL)
+manage.py          comandos de terminal (create-user)
+dependencies.py    quem está logado e o que o perfil pode fazer
+config.py          variáveis de ambiente (APP_ENV, CORS_ORIGINS, HEARTBEAT_TIMEOUT_SECONDS, DATABASE_URL, SESSION_HOURS, COOKIE_SECURE)
 errors.py          formatos de erro que o front espera
-routers/           experiences.py, images.py, settings.py, clients.py (telas), focus.py, ws.py (WebSocket)
+routers/           auth.py (login), experiences.py, images.py, settings.py, clients.py (telas), focus.py, ws.py (WebSocket)
 schemas/           formatos dos dados (Pydantic, JSON em camelCase)
 db/                conexão e tabelas do banco (SQLAlchemy)
 models/            store (banco + sinal de vida em memória) e seed
-services/          validation.py, realtime.py (conexões WebSocket) e ai_service.py no futuro
+services/          validation.py, realtime.py (conexões WebSocket), auth.py (senhas, tokens e limite de tentativas) e ai_service.py no futuro
 tests/             pytest
 ```
 
@@ -236,5 +257,6 @@ Observação: o documento de arquitetura previa `monitors.py` e `assignments.py`
 ## Próximos passos
 
 1. Postgres no deploy (trocar `DATABASE_URL`) e migrações com Alembic.
-2. Pareamento das telas por código, com token por tela (substitui o `?client=`).
-3. IA: `POST /api/ai/command`, sempre com prévia e confirmação do usuário.
+2. Pareamento das telas por código, com token por tela (substitui o `?client=` e fecha as rotas do player).
+3. Tela de gestão de usuários no dashboard (hoje, só pelo `manage.py`).
+4. IA: `POST /api/ai/command`, sempre com prévia e confirmação do usuário.
