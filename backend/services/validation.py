@@ -5,9 +5,6 @@ from urllib.parse import urlparse
 
 TYPES = ("web",)  # imagens tem catalogo proprio
 ORIENTATIONS = ("landscape", "portrait", "any")
-SECTORS = ("finance", "retail", "emerging_tech", "other")
-MAX_TAGS = 5
-MAX_TAG_LENGTH = 30
 
 
 def _text(value: Any) -> str:
@@ -23,28 +20,6 @@ def is_valid_url(value: str) -> bool:
     except ValueError:
         return False
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
-
-
-def clean_sectors(value: Any) -> list[str]:
-    """Setores validos, sem repeticao, na ordem de SECTORS."""
-    if not isinstance(value, list):
-        return []
-    return [sector for sector in SECTORS if sector in value]
-
-
-def clean_tags(value: Any) -> list[str]:
-    """Tags sem espacos nas pontas, sem vazias e sem repetidas
-    (ignora maiusculas e minusculas)."""
-    if not isinstance(value, list):
-        return []
-    tags: list[str] = []
-    seen: set[str] = set()
-    for item in value:
-        tag = _text(item).strip()
-        if tag and tag.casefold() not in seen:
-            seen.add(tag.casefold())
-            tags.append(tag)
-    return tags
 
 
 def validate_experience(data: dict[str, Any]) -> dict[str, str]:
@@ -70,22 +45,6 @@ def validate_experience(data: dict[str, Any]) -> dict[str, str]:
         errors["type"] = "Escolha o tipo de conteúdo."
     if data.get("orientation") not in ORIENTATIONS:
         errors["orientation"] = "Escolha a orientação."
-
-    sectors = data.get("sectors")
-    if not isinstance(sectors, list) or not sectors:
-        errors["sectors"] = "Escolha ao menos um setor."
-    elif any(sector not in SECTORS for sector in sectors):
-        errors["sectors"] = "Escolha setores da lista."
-
-    tags = data.get("tags")
-    if tags is not None and not isinstance(tags, list):
-        errors["tags"] = "Informe as tags como uma lista."
-    else:
-        cleaned = clean_tags(tags)
-        if len(cleaned) > MAX_TAGS:
-            errors["tags"] = f"Use no máximo {MAX_TAGS} tags."
-        elif any(len(tag) > MAX_TAG_LENGTH for tag in cleaned):
-            errors["tags"] = f"Use no máximo {MAX_TAG_LENGTH} caracteres por tag."
     return errors
 
 def validate_image(data: dict[str, Any]) -> dict[str, str]:

@@ -42,7 +42,6 @@ from schemas.image import Image
 from schemas.settings import Settings
 from schemas.user import User
 from services.auth import normalize_email
-from services.validation import clean_sectors, clean_tags
 
 FOCUS_ROW_ID = 1
 SETTINGS_ROW_ID = 1
@@ -261,8 +260,6 @@ class Store:
             url=str(data["url"]).strip(),
             type=data["type"],
             orientation=data["orientation"],
-            sectors=clean_sectors(data.get("sectors")),
-            tags=clean_tags(data.get("tags")),
             active=True,
         )
         with self._session() as s:
@@ -282,8 +279,6 @@ class Store:
             row.url = str(data["url"]).strip()
             row.type = data["type"]
             row.orientation = data["orientation"]
-            row.sectors = clean_sectors(data.get("sectors"))
-            row.tags = clean_tags(data.get("tags"))
             s.commit()
             return Experience.model_validate(row, from_attributes=True)
 
