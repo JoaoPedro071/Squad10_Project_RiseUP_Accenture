@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import ExperienceCard from "@/components/ExperienceCard";
+import PageHeader from "@/components/PageHeader";
 import { fetchExperiences, fetchState } from "@/services/api";
 import { canManage } from "@/lib/permissions";
 import { ui } from "@/lib/ui";
@@ -37,15 +38,18 @@ export default async function ExperiencesPage({
 
   return (
     <section>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-3xl font-bold">Experiências</h1>
-        {manage && (
-          <Link href="/experiences/new" className={ui.buttonPrimary}>
-            <Plus aria-hidden="true" className="h-4 w-4" />
-            Nova experiência
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        title="Experiências"
+        subtitle="Páginas web que podem ser exibidas nas telas."
+        actions={
+          manage && (
+            <Link href="/experiences/new" className={ui.buttonPrimary}>
+              <Plus aria-hidden="true" className="h-4 w-4" />
+              Nova experiência
+            </Link>
+          )
+        }
+      />
       <nav aria-label="Filtrar experiências" className="mb-4 flex gap-2">
         <Link
           href="/experiences"
@@ -69,7 +73,7 @@ export default async function ExperiencesPage({
             : "Nenhuma experiência ativa."}
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className={ui.cardGrid}>
           {shown.map((experience) => (
             <ExperienceCard
               key={experience.id}

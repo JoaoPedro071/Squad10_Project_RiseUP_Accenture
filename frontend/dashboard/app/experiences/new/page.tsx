@@ -1,6 +1,7 @@
 import ExperienceForm from "@/components/ExperienceForm";
 import BackLink from "@/components/BackLink";
 import NoPermission from "@/components/NoPermission";
+import PageHeader from "@/components/PageHeader";
 import { canManage } from "@/lib/permissions";
 import { requireUser } from "@/services/session";
 
@@ -11,7 +12,7 @@ export default async function NewExperiencePage() {
   return (
     <section>
       <BackLink href="/experiences" label="Experiências" />
-      <h1 className="mb-6 text-3xl font-bold">Nova experiência</h1>
+      <PageHeader title="Nova experiência" />
       <ExperienceForm />
     </section>
   );

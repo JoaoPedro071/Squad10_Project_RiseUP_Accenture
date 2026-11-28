@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useBoard } from "@/hooks/useBoard";
+import { ui } from "@/lib/ui";
 import type { Client, Experience, FocusState, Image } from "@/types/api";
 import BoardToolbar from "./BoardToolbar";
 import ClientCard from "./ClientCard";
@@ -49,7 +50,7 @@ export default function ClientsBoard({
         onIdentify={board.identify}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={ui.cardGrid}>
         {clients.map((client) => (
           <ClientCard
             key={client.id}

@@ -1,6 +1,7 @@
 import ImageForm from "@/components/ImageForm";
 import BackLink from "@/components/BackLink";
 import NoPermission from "@/components/NoPermission";
+import PageHeader from "@/components/PageHeader";
 import { canManage } from "@/lib/permissions";
 import { requireUser } from "@/services/session";
 
@@ -11,7 +12,7 @@ export default async function NewImagePage() {
   return (
     <section>
       <BackLink href="/images" label="Imagens" />
-      <h1 className="mb-6 text-3xl font-bold">Nova imagem</h1>
+      <PageHeader title="Nova imagem" />
       <ImageForm />
     </section>
   );

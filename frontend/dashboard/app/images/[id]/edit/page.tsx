@@ -3,6 +3,7 @@ import ImageForm from "@/components/ImageForm";
 import { fetchImages } from "@/services/api";
 import BackLink from "@/components/BackLink";
 import NoPermission from "@/components/NoPermission";
+import PageHeader from "@/components/PageHeader";
 import { canManage } from "@/lib/permissions";
 import { requireUser, withSession } from "@/services/session";
 
@@ -22,7 +23,7 @@ export default async function EditImagePage({ params }: EditImagePageProps) {
   return (
     <section>
       <BackLink href="/images" label="Imagens" />
-      <h1 className="mb-6 text-3xl font-bold">Editar imagem</h1>
+      <PageHeader title="Editar imagem" />
       <ImageForm image={image} />
     </section>
   );

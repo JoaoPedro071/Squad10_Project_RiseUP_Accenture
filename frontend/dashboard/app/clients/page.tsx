@@ -1,4 +1,5 @@
 import ClientsBoard from "@/components/ClientsBoard";
+import PageHeader from "@/components/PageHeader";
 import { fetchExperiences, fetchImages, fetchState } from "@/services/api";
 import { withSession } from "@/services/session";
 
@@ -11,7 +12,10 @@ export default async function ClientsPage() {
 
   return (
     <section>
-      <h1 className="mb-4 text-3xl font-bold">Telas</h1>
+      <PageHeader
+        title="Telas"
+        subtitle="Acompanhe o estado de cada tela e escolha o que ela exibe."
+      />
       {state.clients.length === 0 ? (
         <p>Nenhuma tela cadastrada.</p>
       ) : (

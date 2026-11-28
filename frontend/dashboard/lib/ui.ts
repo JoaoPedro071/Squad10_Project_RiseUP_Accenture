@@ -5,6 +5,11 @@ const buttonBase =
   "interactive inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50";
 
 export const ui = {
+  /** Coluna da página: a mesma no cabeçalho e no conteúdo (alinha logo e títulos). */
+  container: "mx-auto w-full max-w-7xl px-4 md:px-8",
+  /** Grade de cards das listas (Telas, Experiências, Imagens). */
+  cardGrid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+
   /** Ação principal da tela (uma por área). */
   buttonPrimary: `${buttonBase} bg-accent text-white hover:bg-accent-hover`,
   /** Ações secundárias (Cancelar, Editar...). */
