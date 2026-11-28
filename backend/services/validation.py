@@ -3,6 +3,8 @@
 from typing import Any
 from urllib.parse import urlparse
 
+from models.store import store
+
 TYPES = ("web",)  # imagens tem catalogo proprio
 ORIENTATIONS = ("landscape", "portrait", "any")
 
@@ -45,6 +47,23 @@ def validate_experience(data: dict[str, Any]) -> dict[str, str]:
         errors["type"] = "Escolha o tipo de conteúdo."
     if data.get("orientation") not in ORIENTATIONS:
         errors["orientation"] = "Escolha a orientação."
+    return errors
+
+
+MAX_CLIENT_NAME = 60
+
+
+def validate_client(data: dict[str, Any], ignore_id: str | None = None) -> dict[str, str]:
+    """Regras do nome da tela. ignore_id: a propria tela, ao renomear
+    (manter o mesmo nome nao conta como repetido)."""
+    errors: dict[str, str] = {}
+    name = _text(data.get("name")).strip()
+    if not name:
+        errors["name"] = "Informe o nome da tela."
+    elif len(name) > MAX_CLIENT_NAME:
+        errors["name"] = f"Use no máximo {MAX_CLIENT_NAME} caracteres no nome."
+    elif store.client_name_taken(name, ignore_id):
+        errors["name"] = "Já existe uma tela com este nome."
     return errors
 
 def validate_image(data: dict[str, Any]) -> dict[str, str]:

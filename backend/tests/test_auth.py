@@ -182,6 +182,26 @@ def test_support_cannot_change_catalog_settings_or_positions(tc):
         assert r.status_code == 403 and r.json() == forbidden, (method, path)
 
 
+def test_support_cannot_register_screens(tc):
+    login_as(tc, "support")
+    forbidden = {"error": "Seu perfil não permite esta ação."}
+    for method, path, body in [
+        ("post", "/api/clients", {"name": "Nova"}),
+        ("put", "/api/clients/cli-2", {"name": "Outra"}),
+        ("delete", "/api/clients/cli-4", None),
+    ]:
+        kwargs = {} if body is None else {"json": body}
+        r = getattr(tc, method)(path, **kwargs)
+        assert r.status_code == 403 and r.json() == forbidden, (method, path)
+    assert len(tc.get("/api/clients").json()) == 4  # nada mudou
+
+
+def test_screen_routes_require_login(tc):
+    assert tc.post("/api/clients", json={"name": "Nova"}).status_code == 401
+    assert tc.put("/api/clients/cli-2", json={"name": "Outra"}).status_code == 401
+    assert tc.delete("/api/clients/cli-4").status_code == 401
+
+
 def test_coordination_can_change_catalog(tc):
     login_as(tc, "coordination")
     r = tc.put("/api/experiences/exp-1/active", json={"active": False})

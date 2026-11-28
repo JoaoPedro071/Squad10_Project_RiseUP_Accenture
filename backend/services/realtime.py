@@ -53,6 +53,18 @@ class Hub:
             del self.players[client_id]
             self._last_display.pop(client_id, None)
 
+    async def close_player(self, client_id: str) -> None:
+        """Tela removida: fecha o player com 4404 (ele mostra o aviso de
+        tela nao cadastrada) e esquece o que foi enviado a ela."""
+        sockets = self.players.pop(client_id, set())
+        self._last_display.pop(client_id, None)
+        self._version.pop(client_id, None)
+        for websocket in sockets:
+            try:
+                await websocket.close(code=4404, reason="Tela não cadastrada")
+            except Exception:  # conexao ja caiu
+                logger.debug("Falha ao fechar conexao da tela", exc_info=True)
+
     async def add_dashboard(self, websocket: WebSocket, session_hash: str | None) -> None:
         self.dashboards[websocket] = session_hash
         await self._send({websocket}, self._board_message())

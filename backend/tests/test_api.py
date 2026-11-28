@@ -596,6 +596,86 @@ def test_lock_and_unlock():
     assert client.put("/api/clients/xxx/lock", json={"locked": True}).status_code == 404
 
 
+# ---------- cadastro de telas ----------
+
+def test_create_client_ok():
+    r = client.post("/api/clients", json={"name": "  TV Corredor "})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["id"].startswith("cli-") and len(body["id"]) == 12
+    assert body["name"] == "TV Corredor"
+    assert (body["x"], body["y"], body["locked"]) == (50, 50, False)
+    assert body["currentExperienceId"] is None and body["imgId"] is None
+    assert body["status"] == "off"  # ainda nao deu sinal de vida
+    assert screens()[body["id"]]["name"] == "TV Corredor"
+
+
+def test_create_client_name_errors():
+    for name, message in [
+        ("   ", "Informe o nome da tela."),
+        ("x" * 61, "Use no máximo 60 caracteres no nome."),
+        ("Monitor Entrada", "Já existe uma tela com este nome."),
+        ("  monitor ENTRADA ", "Já existe uma tela com este nome."),
+        ("tv sala de reunião", "Já existe uma tela com este nome."),
+    ]:
+        r = client.post("/api/clients", json={"name": name})
+        assert r.status_code == 400, name
+        assert r.json() == {"fieldErrors": {"name": message}}, name
+    assert client.post("/api/clients", json={"name": "x" * 60}).status_code == 201
+    assert len(screens()) == 5  # so a valida foi criada
+
+
+def test_create_client_empty_body():
+    for kwargs in ({}, {"content": "nao e json",
+                        "headers": {"Content-Type": "application/json"}}):
+        r = client.post("/api/clients", **kwargs)
+        assert r.status_code == 400
+        assert r.json() == {"fieldErrors": {"name": "Informe o nome da tela."}}
+
+
+def test_rename_client():
+    r = client.put("/api/clients/cli-2", json={"name": " Sala Grande "})
+    assert r.status_code == 200 and r.json()["name"] == "Sala Grande"
+    assert screens()["cli-2"]["name"] == "Sala Grande"
+    # Mudar so maiusculas do proprio nome nao conta como repetido.
+    assert client.put("/api/clients/cli-2", json={"name": "SALA GRANDE"}).status_code == 200
+    r = client.put("/api/clients/cli-2", json={"name": "monitor entrada"})
+    assert r.status_code == 400
+    assert r.json() == {"fieldErrors": {"name": "Já existe uma tela com este nome."}}
+    r = client.put("/api/clients/cli-2", json={"name": ""})
+    assert r.json() == {"fieldErrors": {"name": "Informe o nome da tela."}}
+    r = client.put("/api/clients/xxx", json={"name": "Outra"})
+    assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
+
+
+def test_delete_client():
+    r = client.delete("/api/clients/cli-4")
+    assert r.status_code == 204 and r.content == b""
+    assert "cli-4" not in screens()
+    assert display("cli-4").status_code == 404
+    r = client.delete("/api/clients/cli-4")
+    assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
+
+
+def test_delete_client_forgets_heartbeat():
+    created = client.post("/api/clients", json={"name": "Nova"}).json()
+    heartbeat(created["id"], {"orientation": "landscape"})
+    client.delete(f"/api/clients/{created['id']}")
+    assert created["id"] not in store._signals
+
+
+def test_delete_client_in_focus_is_blocked():
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    r = client.delete("/api/clients/cli-1")
+    assert r.status_code == 409
+    assert r.json() == {
+        "error": "Esta tela está no Modo foco. Saia do Modo foco antes de removê-la."
+    }
+    assert "cli-1" in screens()
+    # Outra tela (em pausa) pode ser removida durante o foco.
+    assert client.delete("/api/clients/cli-2").status_code == 204
+
+
 # ---------- modo foco ----------
 
 def test_focus_initial_state():

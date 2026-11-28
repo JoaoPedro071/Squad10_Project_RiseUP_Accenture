@@ -71,6 +71,21 @@ def test_screen_changes_survive_restart(open_store):
     assert (cli4.x, cli4.y, cli4.locked) == (10, 20, True)
 
 
+def test_registered_screens_survive_restart(open_store):
+    store = open_store()
+    created = store.create_client("TV Corredor")
+    store.rename_client("cli-2", "Sala Grande")
+    assert store.delete_client("cli-4") is True
+
+    store = restart(store, open_store)
+    assert store.find_client(created.id).name == "TV Corredor"
+    assert (store.find_client(created.id).x, store.find_client(created.id).y) == (50, 50)
+    assert store.find_client("cli-2").name == "Sala Grande"
+    assert store.find_client("cli-4") is None
+    # Nao volta o seed: o banco ja tinha telas.
+    assert len(store.list_clients()) == 4
+
+
 def test_settings_and_focus_survive_restart(open_store):
     store = open_store()
     store.set_standby_image("img-1")

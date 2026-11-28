@@ -229,6 +229,53 @@ class Store:
             s.commit()
             return self._to_client(s, row)
 
+    # --- cadastro de telas ---
+    def client_name_taken(self, name: str, ignore_id: str | None = None) -> bool:
+        """Ja existe outra tela com este nome? Ignora maiusculas/minusculas.
+        A comparacao e feita no Python (casefold), que trata bem os acentos."""
+        wanted = name.strip().casefold()
+        with self._session() as s:
+            rows = s.execute(select(ClientRow.id, ClientRow.name)).all()
+            return any(
+                row_name.casefold() == wanted and row_id != ignore_id
+                for row_id, row_name in rows
+            )
+
+    def create_client(self, name: str) -> Client:
+        """Tela nova: centro da planta, destravada e sem conteudo."""
+        row = ClientRow(
+            id=f"cli-{uuid.uuid4().hex[:8]}",
+            name=name.strip(),
+            x=50,
+            y=50,
+            locked=False,
+        )
+        with self._session() as s:
+            s.add(row)
+            s.commit()
+            return self._to_client(s, row)
+
+    def rename_client(self, client_id: str, name: str) -> Client | None:
+        with self._session() as s:
+            row = self._row(s, ClientRow, client_id)
+            if row is None:
+                return None
+            row.name = name.strip()
+            s.commit()
+            return self._to_client(s, row)
+
+    def delete_client(self, client_id: str) -> bool:
+        """Apaga a tela do banco e o sinal de vida dela. False = nao existe.
+        Quem chama confere antes se ela nao esta no Modo foco."""
+        with self._session() as s:
+            row = self._row(s, ClientRow, client_id)
+            if row is None:
+                return False
+            s.delete(row)
+            s.commit()
+        self._signals.pop(client_id, None)
+        return True
+
     def set_content(
         self,
         client_id: str,
