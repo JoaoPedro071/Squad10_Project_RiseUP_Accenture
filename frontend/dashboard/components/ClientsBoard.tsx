@@ -23,6 +23,7 @@ type ClientsBoardProps = {
   initialFocus: FocusState | null;
   experiences: Experience[];
   images: Image[];
+  canManage: boolean; // Coordenação: renomear e remover nos detalhes da tela
 };
 
 export default function ClientsBoard({
@@ -30,6 +31,7 @@ export default function ClientsBoard({
   initialFocus,
   experiences,
   images,
+  canManage,
 }: ClientsBoardProps) {
   const board = useBoard(initialClients, initialFocus);
   const { clients, focus } = board;
@@ -124,7 +126,7 @@ export default function ClientsBoard({
 
       {shown.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border p-8 text-center text-muted">
-          Nenhuma tela encontrada.
+          {clients.length === 0 ? "Nenhuma tela cadastrada." : "Nenhuma tela encontrada."}
         </p>
       ) : (
         <div className={ui.cardGrid}>
@@ -151,6 +153,7 @@ export default function ClientsBoard({
           images={images}
           busy={board.busyId === editing.id}
           focusActive={focusActive}
+          canManage={canManage}
           onClose={() => setEditingId(null)}
           onUpdate={(update) => {
             board.updateContent(editing.id, update);

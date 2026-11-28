@@ -54,7 +54,19 @@ export function validateExperience(
   return errors;
 }
 
-// --- imagens
+// --- telas (mesmas regras e mensagens do backend) ---
+export const MAX_CLIENT_NAME = 60;
+
+/** Nome vazio ou longo demais. O nome repetido é conferido pelo backend. */
+export function validateClientName(name: string): string | undefined {
+  const value = name.trim();
+  if (!value) return "Informe o nome da tela.";
+  // [...value] conta caracteres como o backend (emojis contam 1).
+  if ([...value].length > MAX_CLIENT_NAME) {
+    return `Use no máximo ${MAX_CLIENT_NAME} caracteres no nome.`;
+  }
+  return undefined;
+}
 
 // --- imagens (mesmas regras e mensagens do backend) ---
 export type ImageInput = {
