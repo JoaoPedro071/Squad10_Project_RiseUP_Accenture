@@ -17,7 +17,7 @@ export const ui = {
   card: "rounded-lg border border-border bg-card p-4",
   label: "mb-1 block text-sm font-bold",
   hint: "mt-1 text-xs text-muted",
-  /** Etiqueta pequena (setores, tags, "Inativa"...). */
+  /** Etiqueta pequena ("Inativa", "Stand-by atual"...). */
   chip: "inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs",
   chipAccent:
     "inline-flex items-center rounded-full border border-accent-light/50 px-2 py-0.5 text-xs text-accent-light",

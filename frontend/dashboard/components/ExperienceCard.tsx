@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { orientationLabel } from "@/lib/orientation";
-import { sectorLabel } from "@/lib/sectors";
 import { ui } from "@/lib/ui";
 import { ApiError, setExperienceActive } from "@/services/api";
 import type { Experience } from "@/types/api";
@@ -63,18 +62,6 @@ export default function ExperienceCard({
         {inUseCount > 0 &&
           ` · Em ${inUseCount} ${inUseCount === 1 ? "tela" : "telas"}`}
       </p>
-      <ul className="mt-2 flex flex-wrap gap-1" aria-label="Setores e tags">
-        {experience.sectors.map((sector) => (
-          <li key={sector} className={ui.chipAccent}>
-            {sectorLabel(sector)}
-          </li>
-        ))}
-        {experience.tags.map((tag) => (
-          <li key={tag} className={ui.chip}>
-            #{tag}
-          </li>
-        ))}
-      </ul>
       {canManage && (
         <div className="mt-auto flex flex-wrap gap-2 pt-4">
           <Link

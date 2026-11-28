@@ -7,15 +7,14 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import FieldError from "./FieldError";
 import Notice from "./Notice";
-import { sectorOptions } from "@/lib/sectors";
-import { cleanTags, MAX_TAGS, validateExperience } from "@/lib/validation";
+import { validateExperience } from "@/lib/validation";
 import type { ExperienceInput, FieldErrors } from "@/lib/validation";
 import {
   createExperience,
   updateExperience,
   ValidationError,
 } from "@/services/api";
-import type { Experience, ExperienceSector } from "@/types/api";
+import type { Experience } from "@/types/api";
 
 type ExperienceFormProps = {
   experience?: Experience; // presente = modo edição
@@ -28,14 +27,7 @@ const fieldOrder: (keyof ExperienceInput)[] = [
   "description",
   "url",
   "orientation",
-  "sectors",
-  "tags",
 ];
-
-// No formulário as tags são digitadas separadas por vírgula.
-function splitTags(text: string): string[] {
-  return cleanTags(text.split(","));
-}
 
 export default function ExperienceForm({
   experience,
@@ -49,10 +41,7 @@ export default function ExperienceForm({
     url: experience?.url ?? "",
     type: "web",
     orientation: experience?.orientation ?? "any",
-    sectors: experience?.sectors ?? [],
-    tags: experience?.tags ?? [],
   });
-  const [tagsText, setTagsText] = useState((experience?.tags ?? []).join(", "));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -70,17 +59,6 @@ export default function ExperienceForm({
   function validateField(field: keyof ExperienceInput) {
     const message = validateExperience(values)[field];
     setErrors((current) => ({ ...current, [field]: message }));
-  }
-
-  function toggleSector(sector: ExperienceSector, checked: boolean) {
-    const next = checked
-      ? [...values.sectors, sector]
-      : values.sectors.filter((item) => item !== sector);
-    setField("sectors", next);
-    setErrors((current) => ({
-      ...current,
-      sectors: validateExperience({ ...values, sectors: next }).sectors,
-    }));
   }
 
   async function save() {
@@ -204,60 +182,6 @@ export default function ExperienceForm({
           <option value="portrait">Retrato</option>
         </select>
         <FieldError id="error-orientation" message={errors.orientation} />
-      </div>
-
-      <fieldset
-        aria-invalid={errors.sectors ? true : undefined}
-        aria-describedby={errors.sectors ? "error-sectors" : undefined}
-      >
-        <legend className={ui.label}>Setores</legend>
-        <div className="flex flex-wrap gap-2">
-          {sectorOptions.map((option, index) => (
-            <label
-              key={option.value}
-              className={`interactive inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/15 ${
-                errors.sectors
-                  ? "border-danger"
-                  : "border-border hover:border-muted"
-              }`}
-            >
-              <input
-                // O primeiro recebe o foco quando há erro.
-                id={index === 0 ? "field-sectors" : undefined}
-                type="checkbox"
-                checked={values.sectors.includes(option.value)}
-                onChange={(e) => toggleSector(option.value, e.target.checked)}
-                className="h-4 w-4 accent-accent"
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
-        <FieldError id="error-sectors" message={errors.sectors} />
-      </fieldset>
-
-      <div>
-        <label htmlFor="field-tags" className={ui.label}>
-          Tags (opcional)
-        </label>
-        <input
-          id="field-tags"
-          type="text"
-          placeholder="ex.: segurança, dados"
-          value={tagsText}
-          onChange={(e) => {
-            setTagsText(e.target.value);
-            setField("tags", splitTags(e.target.value));
-          }}
-          onBlur={() => validateField("tags")}
-          aria-invalid={errors.tags ? true : undefined}
-          aria-describedby={errors.tags ? "error-tags" : "tags-hint"}
-          className={inputClass(!!errors.tags)}
-        />
-        <FieldError id="error-tags" message={errors.tags} />
-        <p id="tags-hint" className={ui.hint}>
-          Separe por vírgula. Até {MAX_TAGS} tags.
-        </p>
       </div>
 
       {formError && <Notice variant="error">{formError}</Notice>}
