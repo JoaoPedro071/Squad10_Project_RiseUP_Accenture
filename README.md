@@ -38,7 +38,7 @@ cd backend
 uv sync
 uv run python manage.py create-user --email voce@exemplo.com --name "Seu Nome" --role coordination
 uv run uvicorn main:app --reload --port 8000
-uv run pytest                    # 119 testes
+uv run pytest                    # 132 testes
 ```
 
 O `create-user` cria o seu usuário do dashboard (só na primeira vez). A senha é pedida no terminal.
@@ -69,7 +69,7 @@ Os dois apps usam o backend em `http://localhost:8000`; suba-o primeiro. O dashb
 |---|---|
 | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | login do dashboard (cookie de sessão) |
 | `GET /api/experiences` | lista o catálogo |
-| `POST /api/experiences` | cria uma experiência (com validação, setores e tags) |
+| `POST /api/experiences` | cria uma experiência (com validação) |
 | `PUT /api/experiences/{id}` | edita uma experiência |
 | `PUT /api/experiences/{id}/active` | ativa ou inativa uma experiência |
 | `GET/POST /api/images` | lista e cadastra imagens |
@@ -77,6 +77,9 @@ Os dois apps usam o backend em `http://localhost:8000`; suba-o primeiro. O dashb
 | `PUT /api/images/{id}/active` | ativa ou inativa uma imagem |
 | `GET/PUT /api/settings` | consulta e escolhe a imagem de stand-by |
 | `GET /api/clients` | lista as telas |
+| `POST /api/clients` | cadastra uma tela (nome único, até 60 caracteres) |
+| `PUT /api/clients/{id}` | renomeia uma tela |
+| `DELETE /api/clients/{id}` | remove uma tela (não pode estar no Modo foco) |
 | `PUT /api/clients/{id}/content` | define o que a tela exibe: experiência, imagem ou nada |
 | `POST /api/clients/{id}/heartbeat` | sinal de vida da tela, com orientação e resolução |
 | `POST /api/clients/identify` | modo de identificação: cada tela mostra o seu número |
@@ -86,7 +89,7 @@ Os dois apps usam o backend em `http://localhost:8000`; suba-o primeiro. O dashb
 | `PUT /api/clients/{id}/lock` | trava ou destrava a posição |
 | `GET/POST/DELETE /api/focus` | consulta, inicia e encerra o Modo foco |
 
-Todas as rotas do dashboard exigem login; catálogo, stand-by e posições exigem o perfil Coordenação. As rotas do player ficam abertas até o pareamento. Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
+Todas as rotas do dashboard exigem login; catálogo, stand-by, posições e cadastro de telas exigem o perfil Coordenação. As rotas do player ficam abertas até o pareamento. Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
 
 ## Status
 
@@ -97,10 +100,11 @@ Todas as rotas do dashboard exigem login; catálogo, stand-by e posições exige
 - [x] Integração entre front-end e back-end (dashboard e player usam a API; páginas de Imagens e Configurações)
 - [x] Persistência em banco de dados (SQLite; Postgres no deploy)
 - [x] CI no GitHub Actions (testes, lint e build)
-- [x] Catálogo completo: editar e inativar experiências, setores e tags, editar imagens
+- [x] Catálogo completo: editar e inativar experiências, editar imagens
 - [x] Tempo real com WebSocket, confirmação de recebimento e modo de identificação
 - [x] Login no dashboard com perfis Coordenação e Apoio
 - [x] Marca Accenture no dashboard e no player (cores, Arial, ícones lucide, símbolo ">")
+- [x] Cadastro de telas e página Telas como no protótipo (métricas, busca e filtro)
 - [ ] Pareamento das telas (código e token por tela)
 - [ ] Planta real do espaço (aguardando o design)
 - [ ] Assistente de IA com confirmação do usuário
