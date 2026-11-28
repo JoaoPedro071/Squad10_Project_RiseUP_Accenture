@@ -10,14 +10,14 @@ Hoje cada tela é configurada na mão, uma por uma. O Experience Manager permite
 
 ```mermaid
 flowchart LR
-    D["Dashboard (Next.js)"] -->|"REST"| A["API (FastAPI)"]
-    P["Player (Next.js, um por tela)"] -->|"consulta o que exibir"| A
+    D["Dashboard (Next.js)"] <-->|"REST + WebSocket"| A["API (FastAPI)"]
+    P["Player (Next.js, um por tela)"] <-->|"WebSocket"| A
     A -.->|"planejado"| G["Gemini Flash (IA)"]
 ```
 
 - **Dashboard:** o operador vê a planta do espaço, escolhe o que cada tela exibe (experiência, imagem ou stand-by), trava a posição e usa o Modo foco (uma tela apresenta e as outras ficam em pausa).
 - **API:** guarda o estado, valida cada ação e informa ao player o que exibir.
-- **Player:** página aberta em cada tela. Envia um sinal de vida com a orientação da máquina e consulta periodicamente o que exibir; o WebSocket é uma próxima etapa.
+- **Player:** página aberta em cada tela. Conectado à API por WebSocket: recebe na hora o que exibir, envia o sinal de vida com a orientação da máquina e confirma cada mudança.
 
 ## Estrutura do repositório
 
@@ -37,7 +37,7 @@ Instale o [uv](https://docs.astral.sh/uv/) uma vez; ele cuida do Python (3.12) e
 cd backend
 uv sync
 uv run uvicorn main:app --reload --port 8000
-uv run pytest                    # 87 testes
+uv run pytest                    # 101 testes
 ```
 
 Documentação interativa da API: http://localhost:8000/docs
@@ -75,6 +75,8 @@ Os dois apps usam o backend em `http://localhost:8000`; suba-o primeiro. Detalhe
 | `GET /api/clients` | lista as telas |
 | `PUT /api/clients/{id}/content` | define o que a tela exibe: experiência, imagem ou nada |
 | `POST /api/clients/{id}/heartbeat` | sinal de vida da tela, com orientação e resolução |
+| `POST /api/clients/identify` | modo de identificação: cada tela mostra o seu número |
+| `WS /ws/player/{id}` e `WS /ws/dashboard` | tempo real: conteúdo, estado das telas, sinal de vida e confirmação |
 | `GET /api/clients/{id}/display` | o que o player deve exibir agora |
 | `PUT /api/clients/{id}/position` | move a tela na planta |
 | `PUT /api/clients/{id}/lock` | trava ou destrava a posição |
@@ -92,7 +94,7 @@ Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
 - [x] Persistência em banco de dados (SQLite; Postgres no deploy)
 - [x] CI no GitHub Actions (testes, lint e build)
 - [x] Catálogo completo: editar e inativar experiências, setores e tags, editar imagens
-- [ ] Tempo real com WebSocket
+- [x] Tempo real com WebSocket, confirmação de recebimento e modo de identificação
 - [ ] Deploy na AWS com custo zero
 - [ ] Assistente de IA com confirmação do usuário
 - [ ] Telas reais: planta do espaço e design system da Accenture

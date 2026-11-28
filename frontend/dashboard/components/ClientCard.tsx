@@ -10,6 +10,7 @@ type ClientCardProps = {
   catalog: Catalog;
   busy: boolean;
   focusActive: boolean;
+  number?: number; // modo de identificação
   onConfigure: () => void;
   onFocus: () => void;
 };
@@ -19,6 +20,7 @@ export default function ClientCard({
   catalog,
   busy,
   focusActive,
+  number,
   onConfigure,
   onFocus,
 }: ClientCardProps) {
@@ -27,7 +29,15 @@ export default function ClientCard({
   return (
     <article className="rounded-lg border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-lg font-semibold">{client.name}</h2>
+        <h2 className="text-lg font-semibold">
+          {number !== undefined && (
+            <span className="mr-2 rounded-md bg-accent px-2 text-white">
+              <span className="sr-only">Número </span>
+              {number}
+            </span>
+          )}
+          {client.name}
+        </h2>
         <StatusBadge status={client.status} />
       </div>
       <p className="mt-2 text-sm text-foreground/80">
@@ -38,8 +48,8 @@ export default function ClientCard({
       </p>
       {client.orientationMismatch && (
         <p className="mt-1 text-xs text-orange-400">
-          <span aria-hidden="true">⚠ </span>
-          A orientação da tela não combina com o conteúdo
+          <span aria-hidden="true">⚠ </span>A orientação da tela não combina com
+          o conteúdo
         </p>
       )}
       {note && <p className="mt-1 text-xs text-yellow-300">{note}</p>}

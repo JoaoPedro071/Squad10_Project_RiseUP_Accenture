@@ -1,85 +1,119 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { WS_URL } from "@/lib/config";
 import {
   ApiError,
   endFocus,
-  fetchState,
+  identifyScreens,
   lockClient,
   moveClient,
   setContent,
   startFocus,
 } from "@/services/api";
-import type { Client, ContentUpdate, FocusState } from "@/types/api";
+import type { Client, ContentUpdate, DashboardMessage, FocusState } from "@/types/api";
+
+const FIRST_RETRY_MS = 1000;
+const MAX_RETRY_MS = 30000;
+const ACK_TIMEOUT_MS = 5000; // tempo para a tela confirmar que exibiu a mudança
 
 function errorMessage(error: unknown, fallback: string) {
   // O backend já responde em português (ex.: "A tela está offline").
   return error instanceof ApiError ? error.message : fallback;
 }
 
-// Nunca diz "Concluído" se a tela ainda não vai exibir a mudança.
-function savedMessage(client: Client) {
+// Tela desligada ou em pausa não vai exibir agora: não espera confirmação.
+function notNowMessage(client: Client): string | null {
   if (client.status === "off") {
     return `Salvo. ${client.name} exibirá o conteúdo quando voltar a se conectar.`;
   }
   if (client.status === "paused") {
     return `Salvo. ${client.name} exibirá o conteúdo ao sair do Modo foco.`;
   }
-  return "Concluído. A tela atualiza em instantes.";
+  return null;
 }
 
+const doneMessage = (name: string) => `Concluído. ${name} já está exibindo o novo conteúdo.`;
+
+// Troca de conteúdo esperando a confirmação da tela (US-12).
+type Waiting = {
+  clientId: string;
+  acked: boolean; // a tela já confirmou
+  responded: boolean; // o backend já respondeu ao PUT
+};
+
 // Estado e ações compartilhados entre /clients e a planta (/).
-// pollMs (opcional): atualiza as telas do servidor a cada N ms.
-export function useBoard(
-  initialClients: Client[],
-  initialFocus: FocusState | null,
-  pollMs?: number,
-) {
+// Recebe as atualizações do backend em tempo real (WebSocket).
+export function useBoard(initialClients: Client[], initialFocus: FocusState | null) {
   const [clients, setClients] = useState(initialClients);
   const [focus, setFocus] = useState(initialFocus);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [focusBusy, setFocusBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [live, setLive] = useState(true); // conexão em tempo real ativa
+  // Modo de identificação: número de cada tela (some sozinho).
+  const [numbers, setNumbers] = useState<Record<string, number> | null>(null);
 
-  // Evita que uma atualização periódica antiga sobrescreva uma ação recente.
-  const pending = useRef(0);
-  const version = useRef(0);
+  const waiting = useRef<Waiting | null>(null);
+  const namesRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    if (!pollMs) return;
-    let cancelled = false;
+    namesRef.current = Object.fromEntries(clients.map((c) => [c.id, c.name]));
+  }, [clients]);
 
-    async function refresh() {
-      if (pending.current > 0) return;
-      const startedAt = version.current;
-      try {
-        const state = await fetchState();
-        if (cancelled || pending.current > 0 || startedAt !== version.current) {
+  useEffect(() => {
+    let socket: WebSocket | null = null;
+    let retryMs = FIRST_RETRY_MS;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let numbersTimer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
+
+    function connect() {
+      socket = new WebSocket(`${WS_URL}/ws/dashboard`);
+      socket.onopen = () => {
+        retryMs = FIRST_RETRY_MS;
+        setLive(true);
+      };
+      socket.onmessage = (event) => {
+        let data: DashboardMessage;
+        try {
+          data = JSON.parse(event.data);
+        } catch {
           return;
         }
-        setClients(state.clients);
-        setFocus(state.focus);
-      } catch {
-        // Sem conexão: mantém o último estado e tenta de novo.
-      }
+        if (data.type === "state") {
+          setClients(data.clients);
+          setFocus(data.focus);
+        } else if (data.type === "ack") {
+          const current = waiting.current;
+          if (current?.clientId !== data.clientId) return;
+          current.acked = true;
+          if (current.responded) {
+            waiting.current = null;
+            setMessage(doneMessage(namesRef.current[data.clientId] ?? "A tela"));
+          }
+        } else if (data.type === "identify") {
+          setNumbers(data.numbers);
+          clearTimeout(numbersTimer);
+          numbersTimer = setTimeout(() => setNumbers(null), data.seconds * 1000);
+        }
+      };
+      socket.onclose = () => {
+        if (stopped) return;
+        setLive(false);
+        retryTimer = setTimeout(connect, retryMs);
+        retryMs = Math.min(retryMs * 2, MAX_RETRY_MS);
+      };
     }
 
-    const timer = setInterval(refresh, pollMs);
+    connect();
     return () => {
-      cancelled = true;
-      clearInterval(timer);
+      stopped = true;
+      clearTimeout(retryTimer);
+      clearTimeout(numbersTimer);
+      socket?.close();
     };
-  }, [pollMs]);
-
-  async function track<T>(action: () => Promise<T>): Promise<T> {
-    pending.current += 1;
-    try {
-      return await action();
-    } finally {
-      pending.current -= 1;
-      version.current += 1;
-    }
-  }
+  }, []);
 
   function replaceClient(updated: Client) {
     setClients((current) =>
@@ -90,11 +124,33 @@ export function useBoard(
   async function updateContent(clientId: string, update: ContentUpdate) {
     setBusyId(clientId);
     setMessage("Atualizando...");
+    const mine: Waiting = { clientId, acked: false, responded: false };
+    waiting.current = mine;
     try {
-      const updated = await track(() => setContent(clientId, update));
+      const updated = await setContent(clientId, update);
       replaceClient(updated);
-      setMessage(savedMessage(updated));
+      if (waiting.current !== mine) return; // já houve outra troca depois desta
+      const note = notNowMessage(updated);
+      if (note) {
+        waiting.current = null;
+        setMessage(note);
+        return;
+      }
+      mine.responded = true;
+      if (mine.acked) {
+        waiting.current = null;
+        setMessage(doneMessage(updated.name));
+        return;
+      }
+      setTimeout(() => {
+        if (waiting.current !== mine) return;
+        waiting.current = null;
+        setMessage(
+          `Salvo, mas ${updated.name} não confirmou o recebimento. Confira se a tela está aberta.`,
+        );
+      }, ACK_TIMEOUT_MS);
     } catch (error) {
+      if (waiting.current === mine) waiting.current = null;
       setMessage(
         errorMessage(error, "Não foi possível trocar o conteúdo. Tente novamente."),
       );
@@ -111,8 +167,7 @@ export function useBoard(
     );
     setMessage("Atualizando...");
     try {
-      const updated = await track(() => moveClient(clientId, x, y));
-      replaceClient(updated);
+      replaceClient(await moveClient(clientId, x, y));
       setMessage("Concluído. Posição salva.");
     } catch (error) {
       if (previous) replaceClient(previous);
@@ -126,8 +181,7 @@ export function useBoard(
     setBusyId(clientId);
     setMessage("Atualizando...");
     try {
-      const updated = await track(() => lockClient(clientId, locked));
-      replaceClient(updated);
+      replaceClient(await lockClient(clientId, locked));
       setMessage(
         locked
           ? "Concluído. Posição travada."
@@ -146,7 +200,7 @@ export function useBoard(
     setFocusBusy(true);
     setMessage("Atualizando...");
     try {
-      const result = await track(() => startFocus(clientId));
+      const result = await startFocus(clientId);
       setClients(result.clients);
       setFocus(result.focus);
       setMessage("Concluído. Modo foco ativo: as outras telas estão em pausa.");
@@ -163,7 +217,7 @@ export function useBoard(
     setFocusBusy(true);
     setMessage("Atualizando...");
     try {
-      const result = await track(() => endFocus());
+      const result = await endFocus();
       setClients(result.clients);
       setFocus(result.focus);
       setMessage("Concluído. Cada tela voltou ao seu conteúdo.");
@@ -176,17 +230,33 @@ export function useBoard(
     }
   }
 
+  async function identify() {
+    try {
+      const result = await identifyScreens();
+      setMessage(
+        `Identificando: cada tela conectada mostra o seu número por ${result.seconds} s.`,
+      );
+    } catch (error) {
+      setMessage(
+        errorMessage(error, "Não foi possível identificar as telas. Tente novamente."),
+      );
+    }
+  }
+
   return {
     clients,
     focus,
     busyId,
     focusBusy,
     message,
+    live,
+    numbers,
     updateContent,
     move,
     lock,
     notify: setMessage,
     startFocusFor,
     exitFocus,
+    identify,
   };
 }

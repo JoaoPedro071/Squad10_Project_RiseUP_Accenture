@@ -1,68 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ExperienceDisplay from "@/components/ExperienceDisplay";
+import IdentifyOverlay from "@/components/IdentifyOverlay";
 import StatusScreen from "@/components/StatusScreen";
-import { useHeartbeat } from "@/hooks/useHeartbeat";
-import { API_URL } from "@/lib/config";
-import type { DisplayState } from "@/types/api";
-
-const POLL_INTERVAL_MS = 1500;
-
-// O que o player sabe da conexão com o backend.
-type Connection =
-  | { kind: "connecting" } // ainda não recebeu nenhuma resposta
-  | { kind: "ok"; display: DisplayState }
-  | { kind: "unknown-screen" }; // o backend não conhece este id (404)
+import { usePlayerSocket } from "@/hooks/usePlayerSocket";
 
 export default function DisplayController() {
   const clientId = useSearchParams().get("client");
-  const [connection, setConnection] = useState<Connection>({
-    kind: "connecting",
-  });
-
-  useHeartbeat(clientId);
-
-  useEffect(() => {
-    if (!clientId) return;
-    const id = clientId;
-    let cancelled = false;
-
-    async function refresh() {
-      try {
-        const response = await fetch(
-          `${API_URL}/api/clients/${encodeURIComponent(id)}/display`,
-          { cache: "no-store" },
-        );
-        if (cancelled) return;
-        if (response.status === 404) {
-          setConnection({ kind: "unknown-screen" });
-          return;
-        }
-        // Erro do servidor: mantém o que já está na tela.
-        if (!response.ok) return;
-        const display: DisplayState = await response.json();
-        if (cancelled) return;
-        // Só troca se mudou, para não recarregar a experiência à toa.
-        setConnection((previous) =>
-          previous.kind === "ok" &&
-          JSON.stringify(previous.display) === JSON.stringify(display)
-            ? previous
-            : { kind: "ok", display },
-        );
-      } catch {
-        // Sem conexão: mantém o último estado na tela e tenta de novo.
-      }
-    }
-
-    refresh();
-    const timer = setInterval(refresh, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [clientId]);
+  const { status, display, identify } = usePlayerSocket(clientId);
 
   if (!clientId) {
     return (
@@ -72,7 +18,7 @@ export default function DisplayController() {
       />
     );
   }
-  if (connection.kind === "unknown-screen") {
+  if (status === "unknown-screen") {
     return (
       <StatusScreen
         title="Tela não cadastrada"
@@ -80,13 +26,28 @@ export default function DisplayController() {
       />
     );
   }
-  if (connection.kind === "connecting") {
-    return <StatusScreen title="Conectando..." />;
+  if (!display) {
+    return (
+      <StatusScreen
+        title={status === "reconnecting" ? "Reconectando..." : "Conectando..."}
+        detail={status === "reconnecting" ? "Sem conexão com o servidor." : undefined}
+      />
+    );
   }
 
   return (
     <div className="cursor-none">
-      <ExperienceDisplay state={connection.display} />
+      <ExperienceDisplay state={display.state} />
+      {status === "reconnecting" && (
+        // Discreto: o conteúdo continua na tela enquanto reconecta.
+        <p
+          role="status"
+          className="fixed right-3 bottom-3 rounded-full bg-black/60 px-3 py-1 text-xs text-white/70"
+        >
+          Reconectando...
+        </p>
+      )}
+      {identify && <IdentifyOverlay number={identify.number} name={identify.name} />}
     </div>
   );
 }

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { useBoard } from "@/hooks/useBoard";
 import type { Client, Experience, FocusState, Image } from "@/types/api";
+import BoardToolbar from "./BoardToolbar";
 import ClientCard from "./ClientCard";
 import FocusBanner from "./FocusBanner";
 import FocusModal from "./FocusModal";
 import ScreenModal from "./ScreenModal";
 
-const POLL_MS = 3000;
 
 type ClientsBoardProps = {
   initialClients: Client[];
@@ -23,7 +23,7 @@ export default function ClientsBoard({
   experiences,
   images,
 }: ClientsBoardProps) {
-  const board = useBoard(initialClients, initialFocus, POLL_MS);
+  const board = useBoard(initialClients, initialFocus);
   const { clients, focus } = board;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [focusTargetId, setFocusTargetId] = useState<string | null>(null);
@@ -43,13 +43,11 @@ export default function ClientsBoard({
         />
       )}
 
-      <p
-        role="status"
-        aria-live="polite"
-        className="mb-4 min-h-6 text-sm text-foreground/80"
-      >
-        {board.message}
-      </p>
+      <BoardToolbar
+        message={board.message}
+        live={board.live}
+        onIdentify={board.identify}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {clients.map((client) => (
@@ -59,6 +57,7 @@ export default function ClientsBoard({
             catalog={{ experiences, images }}
             busy={board.busyId === client.id}
             focusActive={focusActive}
+            number={board.numbers?.[client.id]}
             onConfigure={() => setEditingId(client.id)}
             onFocus={() => setFocusTargetId(client.id)}
           />
