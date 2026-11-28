@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import ExperienceCard from "@/components/ExperienceCard";
+import ExperienceList from "@/components/ExperienceList";
 import PageHeader from "@/components/PageHeader";
 import { fetchExperiences, fetchState } from "@/services/api";
 import { canManage } from "@/lib/permissions";
@@ -26,8 +26,13 @@ export default async function ExperiencesPage({
   const active = experiences.filter((e) => e.active);
   const inactive = experiences.filter((e) => !e.active);
   const shown = showInactive ? inactive : active;
-  const inUseCount = (id: string) =>
-    state.clients.filter((c) => c.currentExperienceId === id).length;
+  // Quantas telas têm cada experiência atribuída.
+  const inUseCounts: Record<string, number> = {};
+  for (const c of state.clients) {
+    if (c.currentExperienceId) {
+      inUseCounts[c.currentExperienceId] = (inUseCounts[c.currentExperienceId] ?? 0) + 1;
+    }
+  }
 
   const tabClass = (selected: boolean) =>
     `interactive inline-flex min-h-11 items-center rounded-md px-4 text-sm ${
@@ -50,40 +55,33 @@ export default async function ExperiencesPage({
           )
         }
       />
-      <nav aria-label="Filtrar experiências" className="mb-4 flex gap-2">
-        <Link
-          href="/experiences"
-          aria-current={showInactive ? undefined : "page"}
-          className={tabClass(!showInactive)}
-        >
-          Ativas ({active.length})
-        </Link>
-        <Link
-          href="/experiences?status=inactive"
-          aria-current={showInactive ? "page" : undefined}
-          className={tabClass(showInactive)}
-        >
-          Inativas ({inactive.length})
-        </Link>
-      </nav>
-      {shown.length === 0 ? (
-        <p className="text-muted">
-          {showInactive
-            ? "Nenhuma experiência inativa."
-            : "Nenhuma experiência ativa."}
-        </p>
-      ) : (
-        <div className={ui.cardGrid}>
-          {shown.map((experience) => (
-            <ExperienceCard
-              key={experience.id}
-              experience={experience}
-              inUseCount={inUseCount(experience.id)}
-              canManage={manage}
-            />
-          ))}
-        </div>
-      )}
+      <ExperienceList
+        tabs={
+          // Os números contam o total da aba, sem o filtro da busca.
+          <nav aria-label="Filtrar experiências" className="flex gap-2">
+            <Link
+              href="/experiences"
+              aria-current={showInactive ? undefined : "page"}
+              className={tabClass(!showInactive)}
+            >
+              Ativas ({active.length})
+            </Link>
+            <Link
+              href="/experiences?status=inactive"
+              aria-current={showInactive ? "page" : undefined}
+              className={tabClass(showInactive)}
+            >
+              Inativas ({inactive.length})
+            </Link>
+          </nav>
+        }
+        experiences={shown}
+        inUseCounts={inUseCounts}
+        canManage={manage}
+        emptyMessage={
+          showInactive ? "Nenhuma experiência inativa." : "Nenhuma experiência ativa."
+        }
+      />
     </section>
   );
 }

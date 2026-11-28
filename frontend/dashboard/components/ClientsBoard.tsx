@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 import { useState } from "react";
 import { useBoard } from "@/hooks/useBoard";
+import { matches } from "@/lib/search";
 import { statusConfig, statusOrder } from "@/lib/status";
 import { inputClass, ui } from "@/lib/ui";
 import type { Client, Experience, FocusState, Image, ScreenStatus } from "@/types/api";
@@ -12,11 +13,6 @@ import FocusBanner from "./FocusBanner";
 import FocusModal from "./FocusModal";
 import MetricCard from "./MetricCard";
 import ScreenModal from "./ScreenModal";
-
-// Para a busca: sem acentos e sem diferenciar maiúsculas ("recepcao" acha "Recepção").
-function normalize(text: string): string {
-  return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase("pt-BR");
-}
 
 type ClientsBoardProps = {
   initialClients: Client[];
@@ -45,11 +41,9 @@ export default function ClientsBoard({
   // Busca e filtro: só no navegador, sobre o estado em tempo real.
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ScreenStatus | "all">("all");
-  const wanted = normalize(query.trim());
   const shown = clients.filter(
     (c) =>
-      (statusFilter === "all" || c.status === statusFilter) &&
-      normalize(c.name).includes(wanted),
+      (statusFilter === "all" || c.status === statusFilter) && matches(query, c.name),
   );
 
   // Métricas: mudam sozinhas a cada aviso do WebSocket.

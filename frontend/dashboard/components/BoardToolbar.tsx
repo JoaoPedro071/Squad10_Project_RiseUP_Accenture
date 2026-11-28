@@ -36,7 +36,10 @@ export default function BoardToolbar({
           Sem conexão em tempo real. Tentando reconectar...
         </Notice>
       )}
-      <p role="status" aria-live="polite" className="min-h-5 text-sm text-accent-soft">
+      {/* Sempre no HTML (o leitor de tela anuncia quando a mensagem aparece),
+          mas sem ocupar espaço vazia: sr-only a tira do fluxo, então o gap
+          do flex também não conta. */}
+      <p role="status" aria-live="polite" className="text-sm text-accent-soft empty:sr-only">
         {message}
       </p>
     </div>

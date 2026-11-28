@@ -25,6 +25,10 @@ export const ui = {
   buttonDanger: `${buttonBase} border border-danger/50 text-danger hover:bg-danger/10`,
 
   card: "rounded-lg border border-border bg-card p-4",
+  /** Card com rodapé: o corpo (p-4, flex-1) fica em cima e o cardFooter
+   * colado embaixo, na mesma altura em todos os cards da linha. */
+  cardFrame: "flex h-full flex-col rounded-lg border border-border bg-card",
+  cardFooter: "mt-auto flex flex-wrap items-center gap-2 border-t border-border px-4 py-3",
   label: "mb-1 block text-sm font-bold",
   hint: "mt-1 text-xs text-muted",
   /** Etiqueta pequena ("Inativa", "Stand-by atual"...). */
