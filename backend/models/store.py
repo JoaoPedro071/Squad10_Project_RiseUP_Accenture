@@ -32,6 +32,7 @@ from schemas.experience import Experience
 from schemas.focus import FocusState
 from schemas.image import Image
 from schemas.settings import Settings
+from services.validation import clean_sectors, clean_tags
 
 FOCUS_ROW_ID = 1
 SETTINGS_ROW_ID = 1
@@ -250,12 +251,42 @@ class Store:
             url=str(data["url"]).strip(),
             type=data["type"],
             orientation=data["orientation"],
+            sectors=clean_sectors(data.get("sectors")),
+            tags=clean_tags(data.get("tags")),
             active=True,
         )
         with self._session() as s:
             s.add(row)
             s.commit()
             return Experience.model_validate(row, from_attributes=True)
+
+
+    def update_experience(self, experience_id: str, data: dict) -> Experience | None:
+        """Troca todos os campos editaveis. O status (ativa) nao muda aqui."""
+        with self._session() as s:
+            row = self._row(s, ExperienceRow, experience_id)
+            if row is None:
+                return None
+            row.title = str(data["title"]).strip()
+            row.description = str(data.get("description") or "").strip()
+            row.url = str(data["url"]).strip()
+            row.type = data["type"]
+            row.orientation = data["orientation"]
+            row.sectors = clean_sectors(data.get("sectors"))
+            row.tags = clean_tags(data.get("tags"))
+            s.commit()
+            return Experience.model_validate(row, from_attributes=True)
+
+
+    def set_experience_active(self, experience_id: str, active: bool) -> Experience | None:
+        with self._session() as s:
+            row = self._row(s, ExperienceRow, experience_id)
+            if row is None:
+                return None
+            row.active = active
+            s.commit()
+            return Experience.model_validate(row, from_attributes=True)
+
 
     def create_image(self, data: dict) -> Image:
         row = ImageRow(
@@ -270,6 +301,21 @@ class Store:
             s.add(row)
             s.commit()
             return Image.model_validate(row, from_attributes=True)
+
+
+    def update_image(self, image_id: str, data: dict) -> Image | None:
+        """Troca todos os campos editaveis. O status (ativa) nao muda aqui."""
+        with self._session() as s:
+            row = self._row(s, ImageRow, image_id)
+            if row is None:
+                return None
+            row.title = str(data["title"]).strip()
+            row.description = str(data.get("description") or "").strip()
+            row.url = str(data["url"]).strip()
+            row.orientation = data["orientation"]
+            s.commit()
+            return Image.model_validate(row, from_attributes=True)
+
 
     def set_image_active(self, image_id: str, active: bool) -> Image | None:
         with self._session() as s:

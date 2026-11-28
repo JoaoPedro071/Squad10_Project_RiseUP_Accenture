@@ -1,11 +1,28 @@
 import Link from "next/link";
 import ExperienceCard from "@/components/ExperienceCard";
-import { fetchExperiences } from "@/services/api";
+import { fetchExperiences, fetchState } from "@/services/api";
 
 export const dynamic = "force-dynamic";
 
-export default async function ExperiencesPage() {
-  const experiences = await fetchExperiences();
+type ExperiencesPageProps = {
+  searchParams: Promise<{ status?: string }>;
+};
+
+export default async function ExperiencesPage({ searchParams }: ExperiencesPageProps) {
+  const { status } = await searchParams;
+  const showInactive = status === "inactive";
+  const [experiences, state] = await Promise.all([fetchExperiences(), fetchState()]);
+
+  const active = experiences.filter((e) => e.active);
+  const inactive = experiences.filter((e) => !e.active);
+  const shown = showInactive ? inactive : active;
+  const inUseCount = (id: string) =>
+    state.clients.filter((c) => c.currentExperienceId === id).length;
+
+  const tabClass = (selected: boolean) =>
+    `inline-flex min-h-11 items-center rounded-md px-4 text-sm focus-visible:outline-2 focus-visible:outline-accent ${
+      selected ? "bg-accent/30 font-medium" : "hover:bg-accent/20"
+    }`;
 
   return (
     <section>
@@ -18,12 +35,34 @@ export default async function ExperiencesPage() {
           Nova experiência
         </Link>
       </div>
-      {experiences.length === 0 ? (
-        <p>Nenhuma experiência cadastrada.</p>
+      <nav aria-label="Filtrar experiências" className="mb-4 flex gap-2">
+        <Link
+          href="/experiences"
+          aria-current={showInactive ? undefined : "page"}
+          className={tabClass(!showInactive)}
+        >
+          Ativas ({active.length})
+        </Link>
+        <Link
+          href="/experiences?status=inactive"
+          aria-current={showInactive ? "page" : undefined}
+          className={tabClass(showInactive)}
+        >
+          Inativas ({inactive.length})
+        </Link>
+      </nav>
+      {shown.length === 0 ? (
+        <p>
+          {showInactive ? "Nenhuma experiência inativa." : "Nenhuma experiência ativa."}
+        </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {experiences.map((experience) => (
-            <ExperienceCard key={experience.id} experience={experience} />
+          {shown.map((experience) => (
+            <ExperienceCard
+              key={experience.id}
+              experience={experience}
+              inUseCount={inUseCount(experience.id)}
+            />
           ))}
         </div>
       )}

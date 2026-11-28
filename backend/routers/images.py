@@ -23,6 +23,18 @@ async def create_image(payload: ImageCreate):
     return store.create_image(data)
 
 
+@router.put("/{image_id}", response_model=Image)
+async def update_image(image_id: str, payload: ImageCreate):
+    """Edita todos os campos (mesmas regras do cadastro)."""
+    if store.find_image(image_id) is None:
+        raise ApiError(404, "Imagem não encontrada")
+    data = payload.model_dump()
+    field_errors = validate_image(data)
+    if field_errors:
+        raise FieldValidationError(field_errors)
+    return store.update_image(image_id, data)
+
+
 @router.put("/{image_id}/active", response_model=Image)
 async def set_image_active(image_id: str, payload: ImageActiveUpdate):
     """Inativa ou reativa. Inativar nao apaga: a imagem some das opcoes de

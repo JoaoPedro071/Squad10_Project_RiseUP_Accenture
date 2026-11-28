@@ -20,6 +20,7 @@ VALID = {
     "url": "https://example.com",
     "type": "web",
     "orientation": "any",
+    "sectors": ["emerging_tech"],
 }
 
 
@@ -28,7 +29,10 @@ def test_list_experiences_camel_case():
     assert r.status_code == 200
     data = r.json()
     assert len(data) == 4
-    assert set(data[0]) == {"id", "title", "description", "url", "type", "orientation", "active"}
+    assert set(data[0]) == {
+        "id", "title", "description", "url", "type", "orientation",
+        "sectors", "tags", "active",
+    }
 
 
 def test_list_clients_camel_case():
@@ -70,6 +74,39 @@ def test_create_experience_field_errors():
     assert errors["url"] == "Use um endereço começando com http:// ou https://."
     assert errors["type"] == "Escolha o tipo de conteúdo."
     assert errors["orientation"] == "Escolha a orientação."
+    assert errors["sectors"] == "Escolha ao menos um setor."
+
+
+def test_create_experience_saves_sectors_and_clean_tags():
+    r = client.post("/api/experiences", json={
+        **VALID,
+        "sectors": ["retail", "finance", "retail"],
+        "tags": ["  Varejo ", "varejo", "", "Dados"],
+    })
+    assert r.status_code == 201
+    body = r.json()
+    assert body["sectors"] == ["finance", "retail"]  # sem repetir, na ordem da lista
+    assert body["tags"] == ["Varejo", "Dados"]  # sem espacos, vazias ou repetidas
+
+
+def test_create_experience_rejects_unknown_sector():
+    r = client.post("/api/experiences", json={**VALID, "sectors": ["saude"]})
+    assert r.status_code == 400
+    assert r.json()["fieldErrors"]["sectors"] == "Escolha setores da lista."
+
+
+def test_create_experience_tag_limits():
+    r = client.post("/api/experiences", json={**VALID, "tags": list("abcdef")})
+    assert r.json()["fieldErrors"]["tags"] == "Use no máximo 5 tags."
+    r = client.post("/api/experiences", json={**VALID, "tags": ["x" * 31]})
+    assert r.json()["fieldErrors"]["tags"] == "Use no máximo 30 caracteres por tag."
+    r = client.post("/api/experiences", json={**VALID, "tags": "ia"})
+    assert r.json()["fieldErrors"]["tags"] == "Informe as tags como uma lista."
+
+
+def test_seed_experiences_have_sectors():
+    for experience in client.get("/api/experiences").json():
+        assert experience["sectors"], experience["id"]
 
 
 def test_create_experience_accepts_internal_path():
@@ -82,6 +119,67 @@ def test_create_experience_invalid_json_body():
                     headers={"Content-Type": "application/json"})
     assert r.status_code == 400
     assert "title" in r.json()["fieldErrors"]
+
+
+# ---------- editar e inativar experiencias ----------
+
+def test_update_experience_ok():
+    r = client.put("/api/experiences/exp-1", json={
+        **VALID, "title": "  Ciber 2.0 ", "sectors": ["finance"], "tags": ["nova"],
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == "exp-1" and body["title"] == "Ciber 2.0"
+    assert body["sectors"] == ["finance"] and body["tags"] == ["nova"]
+    assert body["active"] is True  # editar nao muda o status
+    listed = {e["id"]: e for e in client.get("/api/experiences").json()}
+    assert listed["exp-1"]["title"] == "Ciber 2.0"
+
+
+def test_update_experience_field_errors_keep_old_data():
+    r = client.put("/api/experiences/exp-1", json={**VALID, "title": " ", "sectors": []})
+    assert r.status_code == 400
+    errors = r.json()["fieldErrors"]
+    assert "title" in errors and "sectors" in errors
+    listed = {e["id"]: e for e in client.get("/api/experiences").json()}
+    assert listed["exp-1"]["title"] == "Cibersegurança"
+
+
+def test_update_experience_not_found():
+    r = client.put("/api/experiences/xxx", json=VALID)
+    assert r.status_code == 404 and r.json() == {"error": "Experiência não encontrada"}
+
+
+def test_update_experience_in_use_changes_what_screen_shows():
+    # cli-1 exibe exp-1 (paisagem). Mudar para retrato gera aviso de orientacao.
+    client.put("/api/experiences/exp-1", json={**VALID, "orientation": "portrait"})
+    cli1 = next(c for c in client.get("/api/clients").json() if c["id"] == "cli-1")
+    assert cli1["orientationMismatch"] is True and cli1["status"] == "error"
+
+
+def test_experience_inactivate_and_reactivate():
+    r = client.put("/api/experiences/exp-1/active", json={"active": False})
+    assert r.status_code == 200 and r.json()["active"] is False
+    # Inativar nao apaga e nao tira da tela que ja exibe (EC18).
+    assert len(client.get("/api/experiences").json()) == 4
+    display = client.get("/api/clients/cli-1/display").json()
+    assert display["kind"] == "experience" and display["experience"]["id"] == "exp-1"
+    r = client.put("/api/experiences/exp-1/active", json={"active": True})
+    assert r.status_code == 200 and r.json()["active"] is True
+
+
+def test_inactive_experience_cannot_be_assigned():
+    client.put("/api/experiences/exp-2/active", json={"active": False})
+    r = client.put("/api/clients/cli-2/content", json={"experienceId": "exp-2"})
+    assert r.status_code == 422
+
+
+def test_experience_active_errors():
+    r = client.put("/api/experiences/exp-1/active", json={"active": "sim"})
+    assert r.status_code == 422 and r.json() == {"error": "Campo active inválido"}
+    r = client.put("/api/experiences/xxx/active", json={"active": False})
+    assert r.status_code == 404 and r.json() == {"error": "Experiência não encontrada"}
+
 
 # ---------- imagens ----------
 
@@ -146,6 +244,19 @@ def test_image_active_errors():
     assert r.status_code == 422 and r.json() == {"error": "Campo active inválido"}
     r = client.put("/api/images/xxx/active", json={"active": False})
     assert r.status_code == 404 and r.json() == {"error": "Imagem não encontrada"}
+
+
+def test_update_image_ok_and_errors():
+    r = client.put("/api/images/img-1", json={**VALID_IMAGE, "title": " Cartaz novo "})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == "img-1" and body["title"] == "Cartaz novo"
+    assert body["active"] is True
+    r = client.put("/api/images/img-1", json={**VALID_IMAGE, "url": "ftp://x"})
+    assert r.status_code == 400 and "url" in r.json()["fieldErrors"]
+    r = client.put("/api/images/xxx", json=VALID_IMAGE)
+    assert r.status_code == 404 and r.json() == {"error": "Imagem não encontrada"}
+
 
 # ---------- configuracoes (stand-by global) ----------
 

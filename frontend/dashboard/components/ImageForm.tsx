@@ -6,13 +6,11 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { validateImage } from "@/lib/validation";
 import type { ImageFieldErrors, ImageInput } from "@/lib/validation";
-import { createImage, ValidationError } from "@/services/api";
+import { createImage, updateImage, ValidationError } from "@/services/api";
+import type { Image } from "@/types/api";
 
-const initialValues: ImageInput = {
-  title: "",
-  description: "",
-  url: "",
-  orientation: "any",
+type ImageFormProps = {
+  image?: Image; // presente = modo edição
 };
 
 // Ordem dos campos na tela: usada para focar o primeiro com erro.
@@ -42,13 +40,22 @@ function orientationFromSize(width: number, height: number): ImageInput["orienta
   return "any";
 }
 
-export default function ImageForm() {
+export default function ImageForm({ image }: ImageFormProps) {
   const router = useRouter();
-  const [values, setValues] = useState<ImageInput>(initialValues);
+  const editing = image !== undefined;
+  const [values, setValues] = useState<ImageInput>({
+    title: image?.title ?? "",
+    description: image?.description ?? "",
+    url: image?.url ?? "",
+    orientation: image?.orientation ?? "any",
+  });
   const [errors, setErrors] = useState<ImageFieldErrors>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
-  const [preview, setPreview] = useState<"loading" | "ok" | "error" | null>(null);
+  // Na edição a prévia já começa carregada com a imagem atual.
+  const [preview, setPreview] = useState<"loading" | "ok" | "error" | null>(
+    editing ? "ok" : null,
+  );
 
   function setField<K extends keyof ImageInput>(field: K, value: ImageInput[K]) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -66,6 +73,11 @@ export default function ImageForm() {
     const url = values.url.trim();
     if (!url || validateImage(values).url) {
       setPreview(null);
+      return;
+    }
+    // Na edição, sem trocar o endereço, mantém a orientação escolhida.
+    if (editing && url === image.url) {
+      setPreview("ok");
       return;
     }
     setPreview("loading");
@@ -92,7 +104,8 @@ export default function ImageForm() {
 
     setSaving(true);
     try {
-      await createImage(values);
+      if (editing) await updateImage(image.id, values);
+      else await createImage(values);
       router.push("/images");
       router.refresh();
     } catch (error) {
@@ -207,7 +220,7 @@ export default function ImageForm() {
           disabled={saving}
           className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? "Salvando..." : "Salvar imagem"}
+          {saving ? "Salvando..." : editing ? "Salvar alterações" : "Salvar imagem"}
         </button>
         <Link
           href="/images"

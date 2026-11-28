@@ -37,7 +37,7 @@ Instale o [uv](https://docs.astral.sh/uv/) uma vez; ele cuida do Python (3.12) e
 cd backend
 uv sync
 uv run uvicorn main:app --reload --port 8000
-uv run pytest                    # 75 testes
+uv run pytest                    # 87 testes
 ```
 
 Documentação interativa da API: http://localhost:8000/docs
@@ -65,8 +65,11 @@ Os dois apps usam o backend em `http://localhost:8000`; suba-o primeiro. Detalhe
 | Rota | O que faz |
 |---|---|
 | `GET /api/experiences` | lista o catálogo |
-| `POST /api/experiences` | cria uma experiência (com validação) |
+| `POST /api/experiences` | cria uma experiência (com validação, setores e tags) |
+| `PUT /api/experiences/{id}` | edita uma experiência |
+| `PUT /api/experiences/{id}/active` | ativa ou inativa uma experiência |
 | `GET/POST /api/images` | lista e cadastra imagens |
+| `PUT /api/images/{id}` | edita uma imagem |
 | `PUT /api/images/{id}/active` | ativa ou inativa uma imagem |
 | `GET/PUT /api/settings` | consulta e escolhe a imagem de stand-by |
 | `GET /api/clients` | lista as telas |
@@ -87,6 +90,8 @@ Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
 - [x] Back-end: sinal de vida, 5 estados, aviso de orientação, Modo foco como camada e CORS restrito (70 testes)
 - [x] Integração entre front-end e back-end (dashboard e player usam a API; páginas de Imagens e Configurações)
 - [x] Persistência em banco de dados (SQLite; Postgres no deploy)
+- [x] CI no GitHub Actions (testes, lint e build)
+- [x] Catálogo completo: editar e inativar experiências, setores e tags, editar imagens
 - [ ] Tempo real com WebSocket
 - [ ] Deploy na AWS com custo zero
 - [ ] Assistente de IA com confirmação do usuário

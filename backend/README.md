@@ -79,9 +79,12 @@ Conteúdo com orientação `any` e o stand-by nunca geram erro de orientação.
 | Rota | Quem chama | Corpo | Sucesso | Erros |
 |---|---|---|---|---|
 | `GET /api/experiences` | Dashboard | n/a | `Experience[]` | n/a |
-| `POST /api/experiences` | Dashboard | title, description, url, type, orientation | 201 `Experience` | 400 `{fieldErrors}` |
+| `POST /api/experiences` | Dashboard | title, description, url, type, orientation, sectors, tags | 201 `Experience` | 400 `{fieldErrors}` |
+| `PUT /api/experiences/{id}` | Dashboard | mesmos campos do cadastro | `Experience` | 400 `{fieldErrors}`, 404 |
+| `PUT /api/experiences/{id}/active` | Dashboard | `{active: bool}` | `Experience` | 422, 404 |
 | `GET /api/images` | Dashboard | n/a | `Image[]` | n/a |
 | `POST /api/images` | Dashboard | title, description, url, orientation | 201 `Image` | 400 `{fieldErrors}` |
+| `PUT /api/images/{id}` | Dashboard | mesmos campos do cadastro | `Image` | 400 `{fieldErrors}`, 404 |
 | `PUT /api/images/{id}/active` | Dashboard | `{active: bool}` | `Image` | 422, 404, 409 (é o stand-by atual) |
 | `GET /api/settings` | Dashboard | n/a | `{standbyImageId}` | n/a |
 | `PUT /api/settings` | Dashboard | `{standbyImageId: id \| null}` | `{standbyImageId}` | 422 (imagem inexistente ou inativa) |
@@ -159,7 +162,10 @@ export type ContentOrientation = Orientation | "any";
 
 export type Experience = {
   id: string; title: string; description: string; url: string;
-  type: "web"; orientation: ContentOrientation; active: boolean;
+  type: "web"; orientation: ContentOrientation;
+  sectors: ("finance" | "retail" | "emerging_tech" | "other")[]; // ao menos um
+  tags: string[]; // até 5, até 30 caracteres cada
+  active: boolean;
 };
 
 export type Image = {

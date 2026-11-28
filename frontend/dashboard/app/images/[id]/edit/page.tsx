@@ -1,0 +1,22 @@
+import { notFound } from "next/navigation";
+import ImageForm from "@/components/ImageForm";
+import { fetchImages } from "@/services/api";
+
+export const dynamic = "force-dynamic";
+
+type EditImagePageProps = {
+  params: Promise<{ id: string }>;
+};
+
+export default async function EditImagePage({ params }: EditImagePageProps) {
+  const { id } = await params;
+  const image = (await fetchImages()).find((i) => i.id === id);
+  if (!image) notFound();
+
+  return (
+    <section>
+      <h1 className="mb-4 text-2xl font-bold">Editar imagem</h1>
+      <ImageForm image={image} />
+    </section>
+  );
+}
