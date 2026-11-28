@@ -4,12 +4,14 @@ import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 
 from config import CORS_ORIGINS
-from dependencies import socket_user
+from dependencies import SESSION_COOKIE, socket_user
 from models.store import store
 from routers.clients import RESOLUTION
 from schemas.user import User
+from services.auth import token_hash
 from services.realtime import hub
 
 router = APIRouter()
@@ -24,7 +26,8 @@ def _allowed_origin(websocket: WebSocket) -> bool:
 
 async def _messages(websocket: WebSocket):
     """Mensagens recebidas, ja convertidas de JSON. Ignora o que nao for JSON."""
-    while True:
+    # Para quando o servidor fecha a conexao (ex.: fim da sessao do dashboard).
+    while websocket.application_state == WebSocketState.CONNECTED:
         text = await websocket.receive_text()
         try:
             message = json.loads(text)
@@ -69,7 +72,6 @@ async def player_socket(websocket: WebSocket, client_id: str):
 
 
 @router.websocket("/ws/dashboard")
-@router.websocket("/ws/dashboard")
 async def dashboard_socket(
     websocket: WebSocket, user: Annotated[User | None, Depends(socket_user)]
 ):
@@ -80,7 +82,9 @@ async def dashboard_socket(
     if user is None:
         await websocket.close(code=4401, reason="Faça login para continuar")
         return
-    await hub.add_dashboard(websocket)
+    # Guarda a sessao da conexao: o logout e a expiracao fecham esta aba.
+    token = websocket.cookies.get(SESSION_COOKIE)
+    await hub.add_dashboard(websocket, token_hash(token) if token else None)
     try:
         async for _message in _messages(websocket):
             pass  # o dashboard so recebe

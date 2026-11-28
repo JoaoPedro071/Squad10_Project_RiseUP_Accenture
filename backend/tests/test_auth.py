@@ -4,8 +4,10 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 from starlette.websockets import WebSocketDisconnect
 
+from db.tables import SessionRow
 from main import app
 from models.store import store
 from services.auth import (
@@ -198,3 +200,55 @@ def test_dashboard_socket_with_session(tc):
     cookie = f"em_session={tc.cookies.get('em_session')}"
     with tc.websocket_connect("/ws/dashboard", headers={"cookie": cookie}) as ws:
         assert ws.receive_json()["type"] == "state"
+
+
+# ---------- fim da sessao ----------
+
+def count_sessions():
+    with store._session() as s:
+        return s.scalar(select(func.count()).select_from(SessionRow))
+
+
+def test_login_deletes_expired_sessions(tc):
+    tc.post("/api/auth/login", json=LOGIN)
+    user_id = tc.get("/api/auth/me").json()["id"]
+    store.create_session(user_id, token_hash(new_token()))
+    store.create_session(user_id, token_hash(new_token()))
+    assert count_sessions() == 3
+    now = store._clock()
+    store._clock = lambda: now + timedelta(hours=13)  # todas venceram
+    assert tc.post("/api/auth/login", json=LOGIN).status_code == 200
+    assert count_sessions() == 1  # so a sessao nova
+    assert store.delete_expired_sessions() == 0
+
+
+def test_logout_closes_dashboard_socket(tc):
+    with tc:  # mesmo laco de eventos para o WebSocket e o logout
+        tc.post("/api/auth/login", json=LOGIN)
+        cookie = f"em_session={tc.cookies.get('em_session')}"
+        with tc.websocket_connect("/ws/dashboard", headers={"cookie": cookie}) as ws:
+            assert ws.receive_json()["type"] == "state"
+            assert tc.post("/api/auth/logout").status_code == 204
+            with pytest.raises(WebSocketDisconnect) as closed:
+                ws.receive_json()
+            assert closed.value.code == 4401
+
+
+def test_logout_keeps_other_sessions_open(tc):
+    with tc:
+        tc.post("/api/auth/login", json=LOGIN)
+        cookie = f"em_session={tc.cookies.get('em_session')}"
+        with tc.websocket_connect("/ws/dashboard", headers={"cookie": cookie}) as ws:
+            ws.receive_json()
+            # Outra sessao (outro navegador) faz logout.
+            token = new_token()
+            user_id = tc.get("/api/auth/me").json()["id"]
+            store.create_session(user_id, token_hash(token))
+            mine = tc.cookies.get("em_session")
+            tc.cookies.clear()  # cada pedido abaixo informa o proprio cookie
+            r = tc.post("/api/auth/logout", headers={"cookie": f"em_session={token}"})
+            assert r.status_code == 204
+            r = tc.put("/api/experiences/exp-1/active", json={"active": False},
+                       headers={"cookie": f"em_session={mine}"})
+            assert r.status_code == 200
+            assert ws.receive_json()["type"] == "state"  # esta aba segue recebendo

@@ -7,6 +7,7 @@ from dependencies import SESSION_COOKIE, CurrentUser
 from errors import ApiError
 from models.store import store
 from schemas.user import LoginRequest, User
+from services.realtime import hub
 from services.auth import (
     login_limiter,
     new_token,
@@ -41,6 +42,7 @@ async def login(payload: LoginRequest, request: Request, response: Response):
     login_limiter.clear(key)
 
     user = found[0]
+    store.delete_expired_sessions()  # limpeza: sessoes vencidas nao servem mais
     token = new_token()
     store.create_session(user.id, token_hash(token))
     response.set_cookie(
@@ -61,6 +63,8 @@ async def logout(request: Request):
     token = request.cookies.get(SESSION_COOKIE)
     if token:
         store.delete_session(token_hash(token))
+        # Abas abertas do dashboard com esta sessao param de receber o estado.
+        await hub.close_session(token_hash(token))
     response = Response(status_code=204)
     response.delete_cookie(SESSION_COOKIE, path="/")
     return response

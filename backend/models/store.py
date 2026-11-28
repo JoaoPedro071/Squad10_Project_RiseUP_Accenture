@@ -452,6 +452,16 @@ class Store:
                 return None
             return User.model_validate(user, from_attributes=True)
 
+    def delete_expired_sessions(self) -> int:
+        """Apaga do banco as sessoes vencidas. Devolve quantas apagou."""
+        now = self._clock().timestamp()
+        with self._session() as s:
+            expired = s.scalars(select(SessionRow).where(SessionRow.expires_at <= now)).all()
+            for session in expired:
+                s.delete(session)
+            s.commit()
+            return len(expired)
+
     def delete_session(self, token_hash: str) -> None:
         with self._session() as s:
             session = s.scalar(select(SessionRow).where(SessionRow.token_hash == token_hash))
