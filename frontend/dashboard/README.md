@@ -40,16 +40,25 @@ Se o dashboard for aberto por outro endereço, inclua-o em `CORS_ORIGINS` no bac
 
 Planta e lista recebem as mudanças em tempo real (WebSocket `/ws/dashboard`). Sem conexão, aparece "Sem conexão em tempo real" e o dashboard tenta reconectar sozinho. Ao trocar o conteúdo de uma tela, "Concluído" só aparece quando a tela confirma; sem confirmação em 5 s, um aviso pede para conferir a tela. O botão "Identificar telas" mostra o número de cada tela por 10 s. Com o backend fora do ar ao abrir a página, aparece uma tela de erro com "Tentar novamente".
 
+## Marca Accenture
+
+- **Cores e fonte:** todas em `app/globals.css` (paleta oficial, modo escuro, sem azul). A fonte é Arial; para trocar pela Graphik, mude só `--font-brand`.
+- **Estilos compartilhados:** `lib/ui.ts` (botões, campos, cards, etiquetas, modais). Use esses nomes em vez de repetir classes.
+- **Ícones:** [lucide](https://lucide.dev). Os dos estados ficam em `lib/status.ts`.
+- **Estados das telas:** sempre ícone + texto + cor (`StatusBadge`, `StatusLegend`): Em uso, Disponível, Em pausa, Erro e Desligada.
+- **Logo provisório:** símbolo ">" oficial + "Experience Manager" (`components/BrandMark.tsx`). O logo completo entra quando houver a versão para fundo escuro.
+- **Acessibilidade:** contraste AA em todos os textos, foco visível, alvos de toque com 44 px e animações desligadas para quem prefere menos movimento.
+
 ## Estrutura
 
 ```
 app/            páginas (carregam os dados do backend no servidor)
-components/     telas e modais
+components/     telas, modais e peças reutilizáveis (Notice, FieldError, StatePage, BackLink...)
 hooks/useBoard  estado e ações das telas (planta e lista) e conexão WebSocket
 services/api.ts todas as chamadas ao backend
 services/session.ts  sessão nas páginas do servidor (cookie, usuário logado)
 proxy.ts        manda para o login quem não tem sessão
-lib/            config, permissões, rótulos de status e orientação, validação dos formulários
+lib/            config, permissões, estilos (ui.ts), estados e orientação, validação dos formulários
 types/api.ts    contrato do backend
 ```
 

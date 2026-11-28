@@ -24,3 +24,19 @@ export function screenOrientationText(client: Client): string {
   const label = orientationLabel[client.reportedOrientation];
   return client.reportedResolution ? `${label} · ${client.reportedResolution}` : label;
 }
+
+// Último contato da tela: "agora" enquanto conectada; desligada mostra quando
+// foi visto pela última vez.
+export function lastSeenText(client: Client, now = Date.now()): string {
+  if (client.status !== "off") return "Agora (conectada)";
+  if (!client.lastSeenAt) return "Nunca se conectou";
+  const minutes = Math.floor((now - new Date(client.lastSeenAt).getTime()) / 60000);
+  if (minutes < 1) return "Há menos de 1 min";
+  if (minutes < 60) return `Há ${minutes} min`;
+  return new Date(client.lastSeenAt).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

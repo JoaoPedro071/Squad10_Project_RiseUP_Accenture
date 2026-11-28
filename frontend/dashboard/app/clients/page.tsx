@@ -11,7 +11,7 @@ export default async function ClientsPage() {
 
   return (
     <section>
-      <h1 className="mb-4 text-2xl font-bold">Telas</h1>
+      <h1 className="mb-4 text-3xl font-bold">Telas</h1>
       {state.clients.length === 0 ? (
         <p>Nenhuma tela cadastrada.</p>
       ) : (

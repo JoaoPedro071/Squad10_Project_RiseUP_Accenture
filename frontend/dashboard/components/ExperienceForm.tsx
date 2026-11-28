@@ -1,13 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { inputClass, ui } from "@/lib/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import FieldError from "./FieldError";
+import Notice from "./Notice";
 import { sectorOptions } from "@/lib/sectors";
 import { cleanTags, MAX_TAGS, validateExperience } from "@/lib/validation";
 import type { ExperienceInput, FieldErrors } from "@/lib/validation";
-import { createExperience, updateExperience, ValidationError } from "@/services/api";
+import {
+  createExperience,
+  updateExperience,
+  ValidationError,
+} from "@/services/api";
 import type { Experience, ExperienceSector } from "@/types/api";
 
 type ExperienceFormProps = {
@@ -30,23 +37,10 @@ function splitTags(text: string): string[] {
   return cleanTags(text.split(","));
 }
 
-function inputClass(hasError: boolean) {
-  return `min-h-11 w-full rounded-md border bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-accent ${
-    hasError ? "border-red-400" : "border-border"
-  }`;
-}
-
-function FieldError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null;
-  return (
-    <p id={id} className="mt-1 text-sm text-red-300">
-      <span aria-hidden="true">⚠ </span>
-      {message}
-    </p>
-  );
-}
-
-export default function ExperienceForm({ experience, screensInUse = [] }: ExperienceFormProps) {
+export default function ExperienceForm({
+  experience,
+  screensInUse = [],
+}: ExperienceFormProps) {
   const router = useRouter();
   const editing = experience !== undefined;
   const [values, setValues] = useState<ExperienceInput>({
@@ -127,9 +121,13 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex max-w-xl flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="flex max-w-xl flex-col gap-4"
+    >
       <div>
-        <label htmlFor="field-title" className="mb-1 block text-sm font-medium">
+        <label htmlFor="field-title" className={ui.label}>
           Título
         </label>
         <input
@@ -146,7 +144,7 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
       </div>
 
       <div>
-        <label htmlFor="field-description" className="mb-1 block text-sm font-medium">
+        <label htmlFor="field-description" className={ui.label}>
           Descrição (opcional)
         </label>
         <textarea
@@ -156,14 +154,16 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
           onChange={(e) => setField("description", e.target.value)}
           onBlur={() => validateField("description")}
           aria-invalid={errors.description ? true : undefined}
-          aria-describedby={errors.description ? "error-description" : undefined}
+          aria-describedby={
+            errors.description ? "error-description" : undefined
+          }
           className={`${inputClass(!!errors.description)} py-2`}
         />
         <FieldError id="error-description" message={errors.description} />
       </div>
 
       <div>
-        <label htmlFor="field-url" className="mb-1 block text-sm font-medium">
+        <label htmlFor="field-url" className={ui.label}>
           Endereço do conteúdo
         </label>
         <input
@@ -181,17 +181,22 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
       </div>
 
       <div>
-        <label htmlFor="field-orientation" className="mb-1 block text-sm font-medium">
+        <label htmlFor="field-orientation" className={ui.label}>
           Orientação
         </label>
         <select
           id="field-orientation"
           value={values.orientation}
           onChange={(e) =>
-            setField("orientation", e.target.value as ExperienceInput["orientation"])
+            setField(
+              "orientation",
+              e.target.value as ExperienceInput["orientation"],
+            )
           }
           aria-invalid={errors.orientation ? true : undefined}
-          aria-describedby={errors.orientation ? "error-orientation" : undefined}
+          aria-describedby={
+            errors.orientation ? "error-orientation" : undefined
+          }
           className={inputClass(!!errors.orientation)}
         >
           <option value="any">Qualquer orientação</option>
@@ -205,13 +210,15 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
         aria-invalid={errors.sectors ? true : undefined}
         aria-describedby={errors.sectors ? "error-sectors" : undefined}
       >
-        <legend className="mb-1 text-sm font-medium">Setores</legend>
+        <legend className={ui.label}>Setores</legend>
         <div className="flex flex-wrap gap-2">
           {sectorOptions.map((option, index) => (
             <label
               key={option.value}
-              className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm ${
-                errors.sectors ? "border-red-400" : "border-border"
+              className={`interactive inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/15 ${
+                errors.sectors
+                  ? "border-danger"
+                  : "border-border hover:border-muted"
               }`}
             >
               <input
@@ -230,7 +237,7 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
       </fieldset>
 
       <div>
-        <label htmlFor="field-tags" className="mb-1 block text-sm font-medium">
+        <label htmlFor="field-tags" className={ui.label}>
           Tags (opcional)
         </label>
         <input
@@ -248,21 +255,19 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
           className={inputClass(!!errors.tags)}
         />
         <FieldError id="error-tags" message={errors.tags} />
-        <p id="tags-hint" className="mt-1 text-xs text-foreground/60">
+        <p id="tags-hint" className={ui.hint}>
           Separe por vírgula. Até {MAX_TAGS} tags.
         </p>
       </div>
 
-      {formError && (
-        <p role="alert" className="text-sm text-red-300">
-          <span aria-hidden="true">⚠ </span>
-          {formError}
-        </p>
-      )}
+      {formError && <Notice variant="error">{formError}</Notice>}
 
       {confirming ? (
-        <div role="alert" className="rounded-md border border-amber-300/60 p-4">
-          <p className="text-sm font-medium">
+        <div
+          role="alert"
+          className="rounded-md border border-warning/40 bg-warning/10 p-4"
+        >
+          <p className="text-sm font-bold text-warning">
             {screensInUse.length === 1
               ? "Esta experiência está atribuída a 1 tela, que passa a exibir a versão nova:"
               : `Esta experiência está atribuída a ${screensInUse.length} telas, que passam a exibir a versão nova:`}
@@ -277,7 +282,7 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
               type="button"
               onClick={save}
               disabled={saving}
-              className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+              className={ui.buttonPrimary}
             >
               {saving ? "Salvando..." : "Salvar mesmo assim"}
             </button>
@@ -285,7 +290,7 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
               type="button"
               onClick={() => setConfirming(false)}
               disabled={saving}
-              className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
+              className={ui.buttonSecondary}
             >
               Voltar
             </button>
@@ -293,17 +298,14 @@ export default function ExperienceForm({ experience, screensInUse = [] }: Experi
         </div>
       ) : (
         <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? "Salvando..." : editing ? "Salvar alterações" : "Salvar experiência"}
+          <button type="submit" disabled={saving} className={ui.buttonPrimary}>
+            {saving
+              ? "Salvando..."
+              : editing
+                ? "Salvar alterações"
+                : "Salvar experiência"}
           </button>
-          <Link
-            href="/experiences"
-            className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
-          >
+          <Link href="/experiences" className={ui.buttonSecondary}>
             Cancelar
           </Link>
         </div>

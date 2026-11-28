@@ -1,4 +1,6 @@
+import { GreaterThan } from "@/components/BrandMark";
 import LoginForm from "@/components/LoginForm";
+import { ui } from "@/lib/ui";
 
 type LoginPageProps = {
   searchParams: Promise<{ next?: string }>;
@@ -12,9 +14,10 @@ function safeNext(next?: string): string {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { next } = await searchParams;
   return (
-    <section className="mx-auto mt-10 w-full max-w-sm">
-      <h1 className="mb-1 text-2xl font-bold">Entrar</h1>
-      <p className="mb-6 text-sm text-foreground/70">
+    <section className={`${ui.card} mx-auto mt-10 w-full max-w-sm p-8`}>
+      <GreaterThan className="h-10 w-10" />
+      <h1 className="mt-4 text-3xl font-bold">Entrar</h1>
+      <p className="mt-1 mb-6 text-sm text-muted">
         Use o e-mail e a senha cadastrados pela coordenação.
       </p>
       <LoginForm next={safeNext(next)} />

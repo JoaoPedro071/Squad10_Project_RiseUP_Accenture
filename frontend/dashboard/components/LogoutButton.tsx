@@ -1,7 +1,9 @@
 "use client";
 
+import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ui } from "@/lib/ui";
 import { logout } from "@/services/api";
 
 export default function LogoutButton() {
@@ -20,12 +22,8 @@ export default function LogoutButton() {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={busy}
-      className="min-h-11 rounded-md px-3 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
-    >
+    <button type="button" onClick={handleClick} disabled={busy} className={ui.buttonGhost}>
+      <LogOut aria-hidden="true" className="h-4 w-4" />
       {busy ? "Saindo..." : "Sair"}
     </button>
   );

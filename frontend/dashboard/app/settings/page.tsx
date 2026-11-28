@@ -14,7 +14,7 @@ export default async function SettingsPage() {
 
   return (
     <section>
-      <h1 className="mb-4 text-2xl font-bold">Configurações</h1>
+      <h1 className="mb-6 text-3xl font-bold">Configurações</h1>
       <StandbyForm
         images={images.filter((i) => i.active)}
         initialStandbyId={settings.standbyImageId}

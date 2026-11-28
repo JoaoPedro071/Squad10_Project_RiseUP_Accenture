@@ -1,25 +1,109 @@
 @import "tailwindcss";
 
+/*
+ * Marca Accenture (modo escuro). Fonte: guia da marca e paleta oficial.
+ * - Roxo principal #A100FF; no escuro, textos em roxo usam o tom claro (#BE82FF).
+ * - Modo escuro: sem azul (o guia só permite rosa e aqua como secundárias).
+ * - Estados das telas: sempre com ícone e texto, nunca só a cor.
+ * Os nomes antigos (accent, surface, border...) continuam valendo.
+ */
 :root {
-  --background: #0f0a1a;
-  --foreground: #f3f0fa;
-  --surface: #1a1228;
-  --border: #3b2a5c;
-  --accent: #7c3aed;
+  /* neutros */
+  --background: #000000;
+  --surface: #0d0d0d;
+  --card: #141414;
+  --border: #2a2a2a;
+  --foreground: #ffffff;
+  --muted: #96968c;
+  --sand: #e6e6dc;
+
+  /* roxos da marca */
+  --accent: #a100ff;
+  --accent-hover: #7500c0;
+  --accent-deep: #460073;
+  --accent-light: #be82ff;
+  --accent-soft: #e6dcff;
+
+  /* estados das telas */
+  --status-busy: #be82ff;
+  --status-available: #4ade80;
+  --status-paused: #e6dcff;
+  --status-error: #fb923c;
+  --status-off: #96968c;
+
+  /* avisos */
+  --danger: #f87171;
+  --warning: #facc15;
+
+  /* fonte: Arial até a licença da Graphik ser confirmada (troque só aqui) */
+  --font-brand: Arial, Helvetica, sans-serif;
+
+  /* movimento */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-card: var(--card);
   --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-sand: var(--sand);
   --color-accent: var(--accent);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-light: var(--accent-light);
+  --color-accent-soft: var(--accent-soft);
+  --color-status-busy: var(--status-busy);
+  --color-status-available: var(--status-available);
+  --color-status-paused: var(--status-paused);
+  --color-status-error: var(--status-error);
+  --color-status-off: var(--status-off);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --font-sans: var(--font-brand);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, sans-serif;
+  font-family: var(--font-brand);
+  /* O guia pede texto em peso médio (ou mais) no modo escuro. */
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Contorno de foco visível em tudo (teclado). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Transição curta para botões, links e cards. */
+@utility interactive {
+  transition-property: color, background-color, border-color, box-shadow, opacity, scale;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-out);
+  &:active:not(:disabled) {
+    scale: 0.97;
+  }
+}
+
+/* Quem prefere menos movimento: sem animações. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

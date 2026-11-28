@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { mediaUrl } from "@/lib/config";
+import { inputClass, ui } from "@/lib/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import FieldError from "./FieldError";
+import Notice from "./Notice";
 import { validateImage } from "@/lib/validation";
 import type { ImageFieldErrors, ImageInput } from "@/lib/validation";
 import { createImage, updateImage, ValidationError } from "@/services/api";
@@ -14,26 +18,18 @@ type ImageFormProps = {
 };
 
 // Ordem dos campos na tela: usada para focar o primeiro com erro.
-const fieldOrder: (keyof ImageInput)[] = ["title", "description", "url", "orientation"];
-
-function inputClass(hasError: boolean) {
-  return `min-h-11 w-full rounded-md border bg-background px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-accent ${
-    hasError ? "border-red-400" : "border-border"
-  }`;
-}
-
-function FieldError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null;
-  return (
-    <p id={id} className="mt-1 text-sm text-red-300">
-      <span aria-hidden="true">⚠ </span>
-      {message}
-    </p>
-  );
-}
+const fieldOrder: (keyof ImageInput)[] = [
+  "title",
+  "description",
+  "url",
+  "orientation",
+];
 
 // Sugere a orientação pela proporção da imagem (quase quadrada = qualquer).
-function orientationFromSize(width: number, height: number): ImageInput["orientation"] {
+function orientationFromSize(
+  width: number,
+  height: number,
+): ImageInput["orientation"] {
   const ratio = width / height;
   if (ratio > 1.1) return "landscape";
   if (ratio < 0.9) return "portrait";
@@ -57,7 +53,10 @@ export default function ImageForm({ image }: ImageFormProps) {
     editing ? "ok" : null,
   );
 
-  function setField<K extends keyof ImageInput>(field: K, value: ImageInput[K]) {
+  function setField<K extends keyof ImageInput>(
+    field: K,
+    value: ImageInput[K],
+  ) {
     setValues((current) => ({ ...current, [field]: value }));
   }
 
@@ -84,10 +83,13 @@ export default function ImageForm({ image }: ImageFormProps) {
     const probe = new window.Image();
     probe.onload = () => {
       setPreview("ok");
-      setField("orientation", orientationFromSize(probe.naturalWidth, probe.naturalHeight));
+      setField(
+        "orientation",
+        orientationFromSize(probe.naturalWidth, probe.naturalHeight),
+      );
     };
     probe.onerror = () => setPreview("error");
-    probe.src = url;
+    probe.src = mediaUrl(url);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -119,9 +121,13 @@ export default function ImageForm({ image }: ImageFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex max-w-xl flex-col gap-4">
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="flex max-w-xl flex-col gap-4"
+    >
       <div>
-        <label htmlFor="field-title" className="mb-1 block text-sm font-medium">
+        <label htmlFor="field-title" className={ui.label}>
           Título
         </label>
         <input
@@ -138,7 +144,7 @@ export default function ImageForm({ image }: ImageFormProps) {
       </div>
 
       <div>
-        <label htmlFor="field-description" className="mb-1 block text-sm font-medium">
+        <label htmlFor="field-description" className={ui.label}>
           Descrição (opcional)
         </label>
         <textarea
@@ -148,14 +154,16 @@ export default function ImageForm({ image }: ImageFormProps) {
           onChange={(e) => setField("description", e.target.value)}
           onBlur={() => validateField("description")}
           aria-invalid={errors.description ? true : undefined}
-          aria-describedby={errors.description ? "error-description" : undefined}
+          aria-describedby={
+            errors.description ? "error-description" : undefined
+          }
           className={`${inputClass(!!errors.description)} py-2`}
         />
         <FieldError id="error-description" message={errors.description} />
       </div>
 
       <div>
-        <label htmlFor="field-url" className="mb-1 block text-sm font-medium">
+        <label htmlFor="field-url" className={ui.label}>
           Endereço da imagem
         </label>
         <input
@@ -170,24 +178,25 @@ export default function ImageForm({ image }: ImageFormProps) {
           className={inputClass(!!errors.url)}
         />
         <FieldError id="error-url" message={errors.url} />
-        <p id="url-hint" className="mt-1 text-xs text-foreground/60" aria-live="polite">
+        <p id="url-hint" className={ui.hint} aria-live="polite">
           {preview === "loading" && "Carregando a prévia..."}
-          {preview === "ok" && "Prévia carregada. A orientação foi sugerida pela proporção."}
+          {preview === "ok" &&
+            "Prévia carregada. A orientação foi sugerida pela proporção."}
           {preview === "error" &&
             "Não foi possível carregar a imagem. Confira o endereço; você ainda pode salvar."}
         </p>
         {preview === "ok" && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={values.url.trim()}
+            src={mediaUrl(values.url.trim())}
             alt="Prévia da imagem"
-            className="mt-2 h-40 w-full rounded-md bg-black object-contain"
+            className="mt-2 h-40 w-full rounded-md border border-border bg-black object-contain"
           />
         )}
       </div>
 
       <div>
-        <label htmlFor="field-orientation" className="mb-1 block text-sm font-medium">
+        <label htmlFor="field-orientation" className={ui.label}>
           Orientação
         </label>
         <select
@@ -197,7 +206,9 @@ export default function ImageForm({ image }: ImageFormProps) {
             setField("orientation", e.target.value as ImageInput["orientation"])
           }
           aria-invalid={errors.orientation ? true : undefined}
-          aria-describedby={errors.orientation ? "error-orientation" : undefined}
+          aria-describedby={
+            errors.orientation ? "error-orientation" : undefined
+          }
           className={inputClass(!!errors.orientation)}
         >
           <option value="any">Qualquer orientação</option>
@@ -207,25 +218,17 @@ export default function ImageForm({ image }: ImageFormProps) {
         <FieldError id="error-orientation" message={errors.orientation} />
       </div>
 
-      {formError && (
-        <p role="alert" className="text-sm text-red-300">
-          <span aria-hidden="true">⚠ </span>
-          {formError}
-        </p>
-      )}
+      {formError && <Notice variant="error">{formError}</Notice>}
 
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={saving}
-          className="min-h-11 rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {saving ? "Salvando..." : editing ? "Salvar alterações" : "Salvar imagem"}
+        <button type="submit" disabled={saving} className={ui.buttonPrimary}>
+          {saving
+            ? "Salvando..."
+            : editing
+              ? "Salvar alterações"
+              : "Salvar imagem"}
         </button>
-        <Link
-          href="/images"
-          className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
-        >
+        <Link href="/images" className={ui.buttonSecondary}>
           Cancelar
         </Link>
       </div>

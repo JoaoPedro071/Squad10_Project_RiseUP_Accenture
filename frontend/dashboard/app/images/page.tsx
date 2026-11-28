@@ -1,7 +1,9 @@
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import ImageCard from "@/components/ImageCard";
 import { fetchImages, fetchSettings } from "@/services/api";
 import { canManage } from "@/lib/permissions";
+import { ui } from "@/lib/ui";
 import { currentUser, withSession } from "@/services/session";
 
 export const dynamic = "force-dynamic";
@@ -15,18 +17,16 @@ export default async function ImagesPage() {
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Imagens</h1>
+        <h1 className="text-3xl font-bold">Imagens</h1>
         {manage && (
-          <Link
-            href="/images/new"
-            className="inline-flex min-h-11 items-center rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
+          <Link href="/images/new" className={ui.buttonPrimary}>
+            <Plus aria-hidden="true" className="h-4 w-4" />
             Nova imagem
           </Link>
         )}
       </div>
       {images.length === 0 ? (
-        <p>Nenhuma imagem cadastrada.</p>
+        <p className="text-muted">Nenhuma imagem cadastrada.</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {images.map((image) => (
