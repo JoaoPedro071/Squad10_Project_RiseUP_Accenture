@@ -3,6 +3,9 @@
 
 const buttonBase =
   "interactive inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50";
+// Mesma altura (44 px), com menos recuo e texto menor; nunca quebra linha.
+const buttonCompactBase =
+  "interactive inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-bold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50";
 
 export const ui = {
   /** Coluna da página: a mesma no cabeçalho e no conteúdo (alinha logo e títulos). */
@@ -16,6 +19,8 @@ export const ui = {
   buttonSecondary: `${buttonBase} border border-border bg-card text-foreground hover:border-accent-light/60 hover:bg-accent/10`,
   /** Ações discretas em barras e menus. */
   buttonGhost: `${buttonBase} text-muted hover:bg-accent/10 hover:text-foreground`,
+  /** Versão compacta do buttonGhost (rodapé dos cards). */
+  buttonGhostCompact: `${buttonCompactBase} text-muted hover:bg-accent/10 hover:text-foreground`,
   /** Ações que removem algo. */
   buttonDanger: `${buttonBase} border border-danger/50 text-danger hover:bg-danger/10`,
 
