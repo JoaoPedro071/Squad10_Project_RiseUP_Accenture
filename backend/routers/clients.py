@@ -4,10 +4,11 @@ import re
 from fastapi import APIRouter, Response
 
 from dependencies import COORDINATION, LOGGED
-from errors import ApiError
+from errors import ApiError, FieldValidationError
 from models.store import store
 from schemas.client import (
     Client,
+    ClientCreate,
     ContentUpdate,
     HeartbeatUpdate,
     LockUpdate,
@@ -15,9 +16,11 @@ from schemas.client import (
 )
 from schemas.display import DisplayState
 from services.realtime import IDENTIFY_SECONDS, hub
+from services.validation import validate_client
 
 router = APIRouter(prefix="/api/clients", tags=["clients"])
 
+NOT_FOUND = "Tela não encontrada"
 NO_STORE = {"Cache-Control": "no-store"}
 RESOLUTION = re.compile(r"^\d{2,5}x\d{2,5}$")  # ex.: 1920x1080
 
@@ -35,6 +38,16 @@ def _is_percent(value: object) -> bool:
 @router.get("", response_model=list[Client], dependencies=LOGGED)
 async def list_clients():
     return store.list_clients()
+
+
+@router.post("", response_model=Client, status_code=201, dependencies=COORDINATION)
+async def create_client(payload: ClientCreate):
+    """Cadastra uma tela: nasce no centro da planta, destravada e sem conteudo."""
+    data = payload.model_dump()
+    field_errors = validate_client(data)
+    if field_errors:
+        raise FieldValidationError(field_errors)
+    return store.create_client(str(data["name"]))
 
 
 @router.post("/identify", dependencies=LOGGED)
@@ -156,3 +169,32 @@ async def lock_client(client_id: str, payload: LockUpdate):
     if client is None:
         raise ApiError(404, "Tela não encontrada")
     return client
+
+
+# Rotas com so o id (sem /content, /position...) ficam por ultimo. Elas nao
+# conflitam com as de cima (tem um pedaco a menos no caminho), mas assim a
+# leitura fica na ordem: especificas primeiro.
+@router.put("/{client_id}", response_model=Client, dependencies=COORDINATION)
+async def rename_client(client_id: str, payload: ClientCreate):
+    if store.find_client(client_id) is None:
+        raise ApiError(404, NOT_FOUND)
+    data = payload.model_dump()
+    field_errors = validate_client(data, ignore_id=client_id)
+    if field_errors:
+        raise FieldValidationError(field_errors)
+    return store.rename_client(client_id, str(data["name"]))
+
+
+@router.delete("/{client_id}", status_code=204, dependencies=COORDINATION)
+async def delete_client(client_id: str):
+    """Remove a tela. O player dela, se conectado, e avisado (4404)."""
+    if store.find_client(client_id) is None:
+        raise ApiError(404, NOT_FOUND)
+    focus = store.get_focus()
+    if focus is not None and focus.client_id == client_id:
+        raise ApiError(
+            409, "Esta tela está no Modo foco. Saia do Modo foco antes de removê-la."
+        )
+    store.delete_client(client_id)
+    await hub.close_player(client_id)
+    return Response(status_code=204)

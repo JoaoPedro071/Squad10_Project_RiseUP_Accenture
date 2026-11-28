@@ -7,7 +7,7 @@ O sinal de vida (ultimo aviso, orientacao e resolucao informadas) NAO fica
 aqui: ele vive em memoria, porque muda a cada 5 s e a tela o reenvia sozinha.
 """
 
-from sqlalchemy import JSON, ForeignKey
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.database import Base
@@ -23,9 +23,6 @@ class ExperienceRow(Base):
     url: Mapped[str]
     type: Mapped[str]
     orientation: Mapped[str]
-    # Listas guardadas como JSON (ex.: ["finance", "retail"]).
-    sectors: Mapped[list[str]] = mapped_column(JSON, default=list)
-    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     active: Mapped[bool] = mapped_column(default=True)
 
 

@@ -42,7 +42,6 @@ from schemas.image import Image
 from schemas.settings import Settings
 from schemas.user import User
 from services.auth import normalize_email
-from services.validation import clean_sectors, clean_tags
 
 FOCUS_ROW_ID = 1
 SETTINGS_ROW_ID = 1
@@ -230,6 +229,53 @@ class Store:
             s.commit()
             return self._to_client(s, row)
 
+    # --- cadastro de telas ---
+    def client_name_taken(self, name: str, ignore_id: str | None = None) -> bool:
+        """Ja existe outra tela com este nome? Ignora maiusculas/minusculas.
+        A comparacao e feita no Python (casefold), que trata bem os acentos."""
+        wanted = name.strip().casefold()
+        with self._session() as s:
+            rows = s.execute(select(ClientRow.id, ClientRow.name)).all()
+            return any(
+                row_name.casefold() == wanted and row_id != ignore_id
+                for row_id, row_name in rows
+            )
+
+    def create_client(self, name: str) -> Client:
+        """Tela nova: centro da planta, destravada e sem conteudo."""
+        row = ClientRow(
+            id=f"cli-{uuid.uuid4().hex[:8]}",
+            name=name.strip(),
+            x=50,
+            y=50,
+            locked=False,
+        )
+        with self._session() as s:
+            s.add(row)
+            s.commit()
+            return self._to_client(s, row)
+
+    def rename_client(self, client_id: str, name: str) -> Client | None:
+        with self._session() as s:
+            row = self._row(s, ClientRow, client_id)
+            if row is None:
+                return None
+            row.name = name.strip()
+            s.commit()
+            return self._to_client(s, row)
+
+    def delete_client(self, client_id: str) -> bool:
+        """Apaga a tela do banco e o sinal de vida dela. False = nao existe.
+        Quem chama confere antes se ela nao esta no Modo foco."""
+        with self._session() as s:
+            row = self._row(s, ClientRow, client_id)
+            if row is None:
+                return False
+            s.delete(row)
+            s.commit()
+        self._signals.pop(client_id, None)
+        return True
+
     def set_content(
         self,
         client_id: str,
@@ -261,8 +307,6 @@ class Store:
             url=str(data["url"]).strip(),
             type=data["type"],
             orientation=data["orientation"],
-            sectors=clean_sectors(data.get("sectors")),
-            tags=clean_tags(data.get("tags")),
             active=True,
         )
         with self._session() as s:
@@ -282,8 +326,6 @@ class Store:
             row.url = str(data["url"]).strip()
             row.type = data["type"]
             row.orientation = data["orientation"]
-            row.sectors = clean_sectors(data.get("sectors"))
-            row.tags = clean_tags(data.get("tags"))
             s.commit()
             return Experience.model_validate(row, from_attributes=True)
 
@@ -456,6 +498,16 @@ class Store:
             if user is None or not user.active:
                 return None
             return User.model_validate(user, from_attributes=True)
+
+    def delete_expired_sessions(self) -> int:
+        """Apaga do banco as sessoes vencidas. Devolve quantas apagou."""
+        now = self._clock().timestamp()
+        with self._session() as s:
+            expired = s.scalars(select(SessionRow).where(SessionRow.expires_at <= now)).all()
+            for session in expired:
+                s.delete(session)
+            s.commit()
+            return len(expired)
 
     def delete_session(self, token_hash: str) -> None:
         with self._session() as s:

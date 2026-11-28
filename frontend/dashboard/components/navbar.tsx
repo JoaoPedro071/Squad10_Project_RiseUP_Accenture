@@ -13,6 +13,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { canManage } from "@/lib/permissions";
+import { ui } from "@/lib/ui";
 import type { User } from "@/types/api";
 import BrandMark from "./BrandMark";
 import LogoutButton from "./LogoutButton";
@@ -71,8 +72,9 @@ export default function Navbar({ user }: { user: User | null }) {
     });
 
   return (
+    // O fundo ocupa a largura toda; o conteúdo fica na coluna das páginas.
     <header className="border-b border-border bg-surface">
-      <div className="flex min-h-16 items-center gap-2 px-4 md:px-6">
+      <div className={`${ui.container} flex min-h-16 items-center gap-2`}>
         {user ? (
           <Link href="/" className="mr-4 rounded-md" aria-label="Experience Manager, ir para a planta">
             <BrandMark />
@@ -111,15 +113,17 @@ export default function Navbar({ user }: { user: User | null }) {
       </div>
 
       {user && open && (
-        <div id="mobile-menu" className="border-t border-border px-4 pb-4 md:hidden">
-          <nav aria-label="Principal" className="flex flex-col gap-1 pt-2">
-            {navLinks("drawer")}
-          </nav>
-          <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-            <span className="text-sm text-muted">
-              {user.name} · {roleLabel[user.role]}
-            </span>
-            <LogoutButton />
+        <div id="mobile-menu" className="border-t border-border md:hidden">
+          <div className={`${ui.container} pb-4`}>
+            <nav aria-label="Principal" className="flex flex-col gap-1 pt-2">
+              {navLinks("drawer")}
+            </nav>
+            <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+              <span className="text-sm text-muted">
+                {user.name} · {roleLabel[user.role]}
+              </span>
+              <LogoutButton />
+            </div>
           </div>
         </div>
       )}

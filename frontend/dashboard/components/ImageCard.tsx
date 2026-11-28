@@ -43,36 +43,53 @@ export default function ImageCard({
     }
   }
 
+  const showHint = canManage && isStandby && image.active;
+
+  // Mesmo formato do ExperienceCard: corpo em cima, rodapé com os botões embaixo.
   return (
     <article
-      className={`${ui.card} flex flex-col ${image.active ? "" : "opacity-60"}`}
+      className={`${ui.cardFrame} ${image.active ? "" : "opacity-60"}`}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={mediaUrl(image.url)}
-        alt=""
-        className="h-36 w-full rounded-md border border-border bg-black object-contain"
-      />
-      <div className="mt-3 flex items-start justify-between gap-2">
-        <h2 className="text-lg leading-tight font-bold">{image.title}</h2>
-        <div className="flex flex-wrap justify-end gap-1">
-          {isStandby && (
-            <span className={`${ui.chipAccent} gap-1`}>
-              <Star aria-hidden="true" className="h-3 w-3" />
-              Stand-by atual
-            </span>
-          )}
-          {!image.active && <span className={ui.chip}>Inativa</span>}
+      <div className="flex flex-1 flex-col p-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={mediaUrl(image.url)}
+          alt=""
+          className="h-36 w-full rounded-md border border-border bg-black object-contain"
+        />
+        <div className="mt-3 flex items-start justify-between gap-2">
+          <h2 className="text-lg leading-tight font-bold">{image.title}</h2>
+          <div className="flex flex-wrap justify-end gap-1">
+            {isStandby && (
+              <span className={`${ui.chipAccent} gap-1`}>
+                <Star aria-hidden="true" className="h-3 w-3" />
+                Stand-by atual
+              </span>
+            )}
+            {!image.active && <span className={ui.chip}>Inativa</span>}
+          </div>
         </div>
+        {image.description && (
+          <p className="mt-2 text-sm text-foreground/80">{image.description}</p>
+        )}
+        <p className="mt-3 text-xs text-muted">
+          {orientationLabel[image.orientation]}
+        </p>
+        {showHint && (
+          <div className="mt-3">
+            <p className={ui.hint}>
+              Para inativar, escolha outro stand-by em Configurações.
+            </p>
+          </div>
+        )}
+        {error && (
+          <Notice variant="error" className="mt-3">
+            {error}
+          </Notice>
+        )}
       </div>
-      {image.description && (
-        <p className="mt-2 text-sm text-foreground/80">{image.description}</p>
-      )}
-      <p className="mt-3 text-xs text-muted">
-        {orientationLabel[image.orientation]}
-      </p>
       {canManage && (
-        <div className="mt-auto flex flex-wrap gap-2 pt-4">
+        <div className={ui.cardFooter}>
           <Link
             href={`/images/${image.id}/edit`}
             className={ui.buttonSecondary}
@@ -99,16 +116,6 @@ export default function ImageCard({
             {busy ? "Salvando..." : image.active ? "Inativar" : "Reativar"}
           </button>
         </div>
-      )}
-      {canManage && isStandby && image.active && (
-        <p className={ui.hint}>
-          Para inativar, escolha outro stand-by em Configurações.
-        </p>
-      )}
-      {error && (
-        <Notice variant="error" className="mt-2">
-          {error}
-        </Notice>
       )}
     </article>
   );

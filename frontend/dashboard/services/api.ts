@@ -95,6 +95,16 @@ export const fetchState = (cookie?: string) =>
   request<FocusResponse>("/api/focus", "GET", undefined, cookie);
 
 // --- telas ---
+// Cadastro (só Coordenação). A lista nova chega sozinha pelo WebSocket.
+export const createClient = (name: string) =>
+  request<Client>("/api/clients", "POST", { name });
+
+export const renameClient = (clientId: string, name: string) =>
+  request<Client>(`/api/clients/${clientId}`, "PUT", { name });
+
+export const deleteClient = (clientId: string) =>
+  request<void>(`/api/clients/${clientId}`, "DELETE");
+
 export const setContent = (clientId: string, update: ContentUpdate) =>
   request<Client>(`/api/clients/${clientId}/content`, "PUT", update);
 

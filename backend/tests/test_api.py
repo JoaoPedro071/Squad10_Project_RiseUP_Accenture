@@ -20,7 +20,6 @@ VALID = {
     "url": "https://example.com",
     "type": "web",
     "orientation": "any",
-    "sectors": ["emerging_tech"],
 }
 
 
@@ -30,8 +29,7 @@ def test_list_experiences_camel_case():
     data = r.json()
     assert len(data) == 4
     assert set(data[0]) == {
-        "id", "title", "description", "url", "type", "orientation",
-        "sectors", "tags", "active",
+        "id", "title", "description", "url", "type", "orientation", "active",
     }
 
 
@@ -74,39 +72,6 @@ def test_create_experience_field_errors():
     assert errors["url"] == "Use um endereço começando com http:// ou https://."
     assert errors["type"] == "Escolha o tipo de conteúdo."
     assert errors["orientation"] == "Escolha a orientação."
-    assert errors["sectors"] == "Escolha ao menos um setor."
-
-
-def test_create_experience_saves_sectors_and_clean_tags():
-    r = client.post("/api/experiences", json={
-        **VALID,
-        "sectors": ["retail", "finance", "retail"],
-        "tags": ["  Varejo ", "varejo", "", "Dados"],
-    })
-    assert r.status_code == 201
-    body = r.json()
-    assert body["sectors"] == ["finance", "retail"]  # sem repetir, na ordem da lista
-    assert body["tags"] == ["Varejo", "Dados"]  # sem espacos, vazias ou repetidas
-
-
-def test_create_experience_rejects_unknown_sector():
-    r = client.post("/api/experiences", json={**VALID, "sectors": ["saude"]})
-    assert r.status_code == 400
-    assert r.json()["fieldErrors"]["sectors"] == "Escolha setores da lista."
-
-
-def test_create_experience_tag_limits():
-    r = client.post("/api/experiences", json={**VALID, "tags": list("abcdef")})
-    assert r.json()["fieldErrors"]["tags"] == "Use no máximo 5 tags."
-    r = client.post("/api/experiences", json={**VALID, "tags": ["x" * 31]})
-    assert r.json()["fieldErrors"]["tags"] == "Use no máximo 30 caracteres por tag."
-    r = client.post("/api/experiences", json={**VALID, "tags": "ia"})
-    assert r.json()["fieldErrors"]["tags"] == "Informe as tags como uma lista."
-
-
-def test_seed_experiences_have_sectors():
-    for experience in client.get("/api/experiences").json():
-        assert experience["sectors"], experience["id"]
 
 
 def test_create_experience_accepts_internal_path():
@@ -124,23 +89,20 @@ def test_create_experience_invalid_json_body():
 # ---------- editar e inativar experiencias ----------
 
 def test_update_experience_ok():
-    r = client.put("/api/experiences/exp-1", json={
-        **VALID, "title": "  Ciber 2.0 ", "sectors": ["finance"], "tags": ["nova"],
-    })
+    r = client.put("/api/experiences/exp-1", json={**VALID, "title": "  Ciber 2.0 "})
     assert r.status_code == 200
     body = r.json()
     assert body["id"] == "exp-1" and body["title"] == "Ciber 2.0"
-    assert body["sectors"] == ["finance"] and body["tags"] == ["nova"]
     assert body["active"] is True  # editar nao muda o status
     listed = {e["id"]: e for e in client.get("/api/experiences").json()}
     assert listed["exp-1"]["title"] == "Ciber 2.0"
 
 
 def test_update_experience_field_errors_keep_old_data():
-    r = client.put("/api/experiences/exp-1", json={**VALID, "title": " ", "sectors": []})
+    r = client.put("/api/experiences/exp-1", json={**VALID, "title": " "})
     assert r.status_code == 400
     errors = r.json()["fieldErrors"]
-    assert "title" in errors and "sectors" in errors
+    assert "title" in errors
     listed = {e["id"]: e for e in client.get("/api/experiences").json()}
     assert listed["exp-1"]["title"] == "Cibersegurança"
 
@@ -632,6 +594,86 @@ def test_lock_and_unlock():
     assert client.put("/api/clients/cli-1/position", json={"x": 5, "y": 5}).status_code == 200
     assert client.put("/api/clients/cli-1/lock", json={"locked": "sim"}).status_code == 422
     assert client.put("/api/clients/xxx/lock", json={"locked": True}).status_code == 404
+
+
+# ---------- cadastro de telas ----------
+
+def test_create_client_ok():
+    r = client.post("/api/clients", json={"name": "  TV Corredor "})
+    assert r.status_code == 201
+    body = r.json()
+    assert body["id"].startswith("cli-") and len(body["id"]) == 12
+    assert body["name"] == "TV Corredor"
+    assert (body["x"], body["y"], body["locked"]) == (50, 50, False)
+    assert body["currentExperienceId"] is None and body["imgId"] is None
+    assert body["status"] == "off"  # ainda nao deu sinal de vida
+    assert screens()[body["id"]]["name"] == "TV Corredor"
+
+
+def test_create_client_name_errors():
+    for name, message in [
+        ("   ", "Informe o nome da tela."),
+        ("x" * 61, "Use no máximo 60 caracteres no nome."),
+        ("Monitor Entrada", "Já existe uma tela com este nome."),
+        ("  monitor ENTRADA ", "Já existe uma tela com este nome."),
+        ("tv sala de reunião", "Já existe uma tela com este nome."),
+    ]:
+        r = client.post("/api/clients", json={"name": name})
+        assert r.status_code == 400, name
+        assert r.json() == {"fieldErrors": {"name": message}}, name
+    assert client.post("/api/clients", json={"name": "x" * 60}).status_code == 201
+    assert len(screens()) == 5  # so a valida foi criada
+
+
+def test_create_client_empty_body():
+    for kwargs in ({}, {"content": "nao e json",
+                        "headers": {"Content-Type": "application/json"}}):
+        r = client.post("/api/clients", **kwargs)
+        assert r.status_code == 400
+        assert r.json() == {"fieldErrors": {"name": "Informe o nome da tela."}}
+
+
+def test_rename_client():
+    r = client.put("/api/clients/cli-2", json={"name": " Sala Grande "})
+    assert r.status_code == 200 and r.json()["name"] == "Sala Grande"
+    assert screens()["cli-2"]["name"] == "Sala Grande"
+    # Mudar so maiusculas do proprio nome nao conta como repetido.
+    assert client.put("/api/clients/cli-2", json={"name": "SALA GRANDE"}).status_code == 200
+    r = client.put("/api/clients/cli-2", json={"name": "monitor entrada"})
+    assert r.status_code == 400
+    assert r.json() == {"fieldErrors": {"name": "Já existe uma tela com este nome."}}
+    r = client.put("/api/clients/cli-2", json={"name": ""})
+    assert r.json() == {"fieldErrors": {"name": "Informe o nome da tela."}}
+    r = client.put("/api/clients/xxx", json={"name": "Outra"})
+    assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
+
+
+def test_delete_client():
+    r = client.delete("/api/clients/cli-4")
+    assert r.status_code == 204 and r.content == b""
+    assert "cli-4" not in screens()
+    assert display("cli-4").status_code == 404
+    r = client.delete("/api/clients/cli-4")
+    assert r.status_code == 404 and r.json() == {"error": "Tela não encontrada"}
+
+
+def test_delete_client_forgets_heartbeat():
+    created = client.post("/api/clients", json={"name": "Nova"}).json()
+    heartbeat(created["id"], {"orientation": "landscape"})
+    client.delete(f"/api/clients/{created['id']}")
+    assert created["id"] not in store._signals
+
+
+def test_delete_client_in_focus_is_blocked():
+    client.post("/api/focus", json={"clientId": "cli-1"})
+    r = client.delete("/api/clients/cli-1")
+    assert r.status_code == 409
+    assert r.json() == {
+        "error": "Esta tela está no Modo foco. Saia do Modo foco antes de removê-la."
+    }
+    assert "cli-1" in screens()
+    # Outra tela (em pausa) pode ser removida durante o foco.
+    assert client.delete("/api/clients/cli-2").status_code == 204
 
 
 # ---------- modo foco ----------

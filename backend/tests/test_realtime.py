@@ -7,6 +7,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from main import app
 from models.store import store
+from services.auth import hash_password, new_token, token_hash
 from services.realtime import hub
 
 
@@ -127,6 +128,56 @@ def test_tick_tells_dashboard_when_screen_goes_off(tc):
         tc.portal.call(hub.tick)
         statuses = {c["id"]: c["status"] for c in board.receive_json()["clients"]}
         assert statuses["cli-1"] == "off"
+
+
+def test_tick_closes_dashboard_when_session_expires(tc):
+    user = store.create_user("ana@exemplo.com", "Ana", hash_password("senha-forte-123"),
+                             "coordination")
+    token = new_token()
+    store.create_session(user.id, token_hash(token))
+    with tc.websocket_connect("/ws/dashboard", headers={"cookie": f"em_session={token}"}) as board:
+        board.receive_json()
+        now = store._clock()
+        store._clock = lambda: now + timedelta(hours=13)  # passou das 12 h
+        tc.portal.call(hub.tick)
+        with pytest.raises(WebSocketDisconnect) as closed:
+            board.receive_json()
+        assert closed.value.code == 4401
+
+
+def test_tick_keeps_dashboard_without_cookie(tc):
+    # Conexao sem cookie (usuario falso dos testes): nao e derrubada.
+    with tc.websocket_connect("/ws/dashboard") as board:
+        board.receive_json()
+        tc.portal.call(hub.tick)
+        assert len(hub.dashboards) == 1
+
+
+# ---------- cadastro de telas ----------
+
+def test_deleting_screen_closes_its_player(tc):
+    created = tc.post("/api/clients", json={"name": "TV Corredor"}).json()
+    with tc.websocket_connect(f"/ws/player/{created['id']}") as player, \
+            tc.websocket_connect("/ws/dashboard") as board:
+        assert player.receive_json()["state"]["kind"] == "standby"
+        board.receive_json()
+        assert tc.delete(f"/api/clients/{created['id']}").status_code == 204
+        with pytest.raises(WebSocketDisconnect) as closed:
+            player.receive_json()
+        assert closed.value.code == 4404
+        ids = [c["id"] for c in board.receive_json()["clients"]]
+        assert created["id"] not in ids  # o dashboard soube na hora
+
+
+def test_create_and_rename_reach_dashboard(tc):
+    with tc.websocket_connect("/ws/dashboard") as board:
+        board.receive_json()
+        created = tc.post("/api/clients", json={"name": "Nova"}).json()
+        names = {c["id"]: c["name"] for c in board.receive_json()["clients"]}
+        assert names[created["id"]] == "Nova"
+        tc.put(f"/api/clients/{created['id']}", json={"name": "Renomeada"})
+        names = {c["id"]: c["name"] for c in board.receive_json()["clients"]}
+        assert names[created["id"]] == "Renomeada"
 
 
 # ---------- confirmacao de recebimento ----------

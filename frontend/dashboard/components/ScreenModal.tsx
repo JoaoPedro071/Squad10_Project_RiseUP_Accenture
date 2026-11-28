@@ -4,19 +4,24 @@ import {
   Check,
   Clapperboard,
   Clock,
+  Copy,
   ExternalLink,
   Focus,
   Image as ImageIcon,
   Maximize2,
   Monitor,
+  Pencil,
   Repeat,
   RotateCw,
+  Trash2,
   TriangleAlert,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { CLIENT_APP_URL } from "@/lib/config";
+import { useCopy } from "@/hooks/useCopy";
+import { CLIENT_APP_URL, playerUrl } from "@/lib/config";
+import { ApiError, deleteClient } from "@/services/api";
 import { contentLabel, pendingNote } from "@/lib/content";
 import {
   isIncompatible,
@@ -31,7 +36,10 @@ import type {
   Experience,
   Image,
 } from "@/types/api";
+import ClientFormModal from "./ClientFormModal";
+import ConfirmModal from "./ConfirmModal";
 import Notice from "./Notice";
+import PlayerAddress from "./PlayerAddress";
 import StatusBadge from "./StatusBadge";
 
 type Item = { id: string; title: string; orientation: ContentOrientation };
@@ -43,6 +51,7 @@ type ScreenModalProps = {
   images: Image[];
   busy: boolean;
   focusActive: boolean;
+  canManage?: boolean; // Coordenação: copiar endereço, renomear e remover
   onClose: () => void;
   onUpdate: (update: ContentUpdate) => void;
   onFocus: () => void;
@@ -59,6 +68,7 @@ export default function ScreenModal({
   images,
   busy,
   focusActive,
+  canManage = false,
   onClose,
   onUpdate,
   onFocus,
@@ -66,6 +76,30 @@ export default function ScreenModal({
   const dialogRef = useRef<HTMLDialogElement>(null);
   // Conteúdo com orientação diferente da tela, aguardando confirmação.
   const [pending, setPending] = useState<Pending | null>(null);
+
+  // --- Gerenciar tela (só Coordenação) ---
+  const { state: copyState, copy } = useCopy();
+  const [renaming, setRenaming] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeError, setRemoveError] = useState("");
+
+  async function remove() {
+    setRemoveBusy(true);
+    setRemoveError("");
+    try {
+      await deleteClient(client.id);
+      onClose(); // fecha a confirmação e os detalhes; a lista nova chega pelo WebSocket
+    } catch (error) {
+      // Ex.: 409 "Esta tela está no Modo foco..." (mensagem do backend).
+      setRemoveError(
+        error instanceof ApiError
+          ? error.message
+          : "Não foi possível remover a tela. Tente novamente.",
+      );
+      setRemoveBusy(false);
+    }
+  }
 
   // Abre o <dialog> assim que o componente aparece.
   useEffect(() => {
@@ -167,196 +201,268 @@ export default function ScreenModal({
     { icon: Clock, label: "Último contato", value: lastSeenText(client) },
   ];
 
+  // Os modais de renomear e remover ficam FORA do <dialog> (irmãos dele): no
+  // React o evento "close" sobe pela árvore, e fechar um deles com Esc
+  // fecharia também os detalhes.
   return (
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      aria-labelledby="screen-title"
-      className="relative m-auto max-h-[90vh] w-[94vw] max-w-4xl overflow-hidden rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-black/70"
-    >
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Fechar"
-        className="interactive absolute top-3 right-3 z-10 flex h-11 w-11 items-center justify-center rounded-md bg-card text-muted hover:bg-accent/10 hover:text-foreground"
+    <>
+      <dialog
+        ref={dialogRef}
+        onClose={onClose}
+        aria-labelledby="screen-title"
+        className="relative m-auto max-h-[90vh] w-[94vw] max-w-4xl overflow-hidden rounded-lg border border-border bg-card p-0 text-foreground backdrop:bg-black/70"
       >
-        <X aria-hidden="true" className="h-5 w-5" />
-      </button>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar"
+          className="interactive absolute top-3 right-3 z-10 flex h-11 w-11 items-center justify-center rounded-md bg-card text-muted hover:bg-accent/10 hover:text-foreground"
+        >
+          <X aria-hidden="true" className="h-5 w-5" />
+        </button>
 
-      {/* No celular a janela inteira rola; no computador, só a coluna da direita. */}
-      <div className="flex max-h-[90vh] flex-col overflow-y-auto md:flex-row md:overflow-hidden">
-        {/* Esquerda: a tela e o que ela informou */}
-        <section className="flex shrink-0 flex-col gap-5 border-b border-border p-5 md:w-80 md:border-r md:border-b-0">
-          <div className="flex items-center gap-3 pr-10 md:pr-0">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-accent/15 text-accent-light">
-              <Monitor aria-hidden="true" className="h-6 w-6" />
-            </span>
-            <div className="min-w-0">
-              <h2 id="screen-title" className="truncate text-xl font-bold">
-                {client.name}
-              </h2>
-              <StatusBadge status={client.status} />
+        {/* No celular a janela inteira rola; no computador, só a coluna da direita. */}
+        <div className="flex max-h-[90vh] flex-col overflow-y-auto md:flex-row md:overflow-hidden">
+          {/* Esquerda: a tela e o que ela informou */}
+          <section className="flex shrink-0 flex-col gap-5 border-b border-border p-5 md:w-80 md:border-r md:border-b-0">
+            <div className="flex items-center gap-3 pr-10 md:pr-0">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-accent/15 text-accent-light">
+                <Monitor aria-hidden="true" className="h-6 w-6" />
+              </span>
+              <div className="min-w-0">
+                <h2 id="screen-title" className="truncate text-xl font-bold">
+                  {client.name}
+                </h2>
+                <StatusBadge status={client.status} />
+              </div>
             </div>
-          </div>
 
-          <div>
-            <h3 className={sectionTitle}>Exibindo</h3>
-            <p className="text-sm">
-              {contentLabel(client, { experiences, images })}
-            </p>
-            {note && (
-              <Notice variant="warning" className="mt-2">
-                {note}
-              </Notice>
-            )}
-          </div>
-
-          <div>
-            <h3 className={sectionTitle}>Detalhes da tela</h3>
-            <dl className="space-y-2.5 text-sm">
-              {details.map(({ icon: Icon, label, value, warn }) => (
-                <div key={label} className="flex items-center gap-3">
-                  <Icon
-                    aria-hidden="true"
-                    className="h-4 w-4 shrink-0 text-accent-light"
-                  />
-                  <dt className="text-muted">{label}</dt>
-                  <dd className="ml-auto flex items-center gap-1 font-bold">
-                    {warn && (
-                      <TriangleAlert
-                        aria-label="Erro de configuração"
-                        className="h-4 w-4 text-status-error"
-                      />
-                    )}
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <p className={ui.hint}>
-              Informado automaticamente pela máquina ligada à tela.
-            </p>
-            {client.orientationMismatch && (
-              <Notice variant="warning" className="mt-2">
-                A orientação da máquina não combina com o conteúdo exibido. Gire
-                a tela na máquina ou escolha outro conteúdo.
-              </Notice>
-            )}
-          </div>
-
-          <div className="mt-auto flex flex-wrap gap-2">
-            {currentExperience && currentImage && (
-              <button
-                type="button"
-                onClick={() => onUpdate({ displayImg: !client.displayImg })}
-                disabled={busy}
-                className={ui.buttonSecondary}
-              >
-                <Repeat aria-hidden="true" className="h-4 w-4" />
-                {client.displayImg ? "Exibir a experiência" : "Exibir a imagem"}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onFocus}
-              disabled={busy || client.status === "off" || focusActive}
-              className={ui.buttonSecondary}
-            >
-              <Focus aria-hidden="true" className="h-4 w-4" />
-              Modo foco
-            </button>
-            <a
-              href={`${CLIENT_APP_URL}/?client=${client.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={ui.buttonGhost}
-            >
-              <ExternalLink aria-hidden="true" className="h-4 w-4" />
-              Abrir tela
-              <span className="sr-only"> (abre em nova aba)</span>
-            </a>
-          </div>
-        </section>
-
-        {/* Direita: escolha do conteúdo */}
-        <section className="min-h-0 flex-1 p-5 md:overflow-y-auto">
-          {pending && (
-            <Notice variant="warning" className="mb-4 mr-12">
-              <p>
-                {pending.item.title} é em{" "}
-                {orientationLabel[pending.item.orientation].toLowerCase()} e a
-                tela está em{" "}
-                {client.reportedOrientation
-                  ? orientationLabel[client.reportedOrientation].toLowerCase()
-                  : "outra orientação"}
-                . O conteúdo pode aparecer cortado ou com bordas.
+            <div>
+              <h3 className={sectionTitle}>Exibindo</h3>
+              <p className="text-sm">
+                {contentLabel(client, { experiences, images })}
               </p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              {note && (
+                <Notice variant="warning" className="mt-2">
+                  {note}
+                </Notice>
+              )}
+            </div>
+
+            <div>
+              <h3 className={sectionTitle}>Detalhes da tela</h3>
+              <dl className="space-y-2.5 text-sm">
+                {details.map(({ icon: Icon, label, value, warn }) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <Icon
+                      aria-hidden="true"
+                      className="h-4 w-4 shrink-0 text-accent-light"
+                    />
+                    <dt className="text-muted">{label}</dt>
+                    <dd className="ml-auto flex items-center gap-1 font-bold">
+                      {warn && (
+                        <TriangleAlert
+                          aria-label="Erro de configuração"
+                          className="h-4 w-4 text-status-error"
+                        />
+                      )}
+                      {value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <p className={ui.hint}>
+                Informado automaticamente pela máquina ligada à tela.
+              </p>
+              {client.orientationMismatch && (
+                <Notice variant="warning" className="mt-2">
+                  A orientação da máquina não combina com o conteúdo exibido. Gire
+                  a tela na máquina ou escolha outro conteúdo.
+                </Notice>
+              )}
+            </div>
+
+            <div className="mt-auto flex flex-wrap gap-2">
+              {currentExperience && currentImage && (
                 <button
                   type="button"
-                  onClick={() => {
-                    onUpdate(pending.update);
-                    setPending(null);
-                  }}
-                  className={ui.buttonPrimary}
-                >
-                  Aplicar assim mesmo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPending(null)}
+                  onClick={() => onUpdate({ displayImg: !client.displayImg })}
+                  disabled={busy}
                   className={ui.buttonSecondary}
                 >
-                  Cancelar
+                  <Repeat aria-hidden="true" className="h-4 w-4" />
+                  {client.displayImg ? "Exibir a experiência" : "Exibir a imagem"}
                 </button>
+              )}
+              <button
+                type="button"
+                onClick={onFocus}
+                disabled={busy || client.status === "off" || focusActive}
+                className={ui.buttonSecondary}
+              >
+                <Focus aria-hidden="true" className="h-4 w-4" />
+                Modo foco
+              </button>
+              <a
+                href={`${CLIENT_APP_URL}/?client=${client.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={ui.buttonGhost}
+              >
+                <ExternalLink aria-hidden="true" className="h-4 w-4" />
+                Abrir tela
+                <span className="sr-only"> (abre em nova aba)</span>
+              </a>
+            </div>
+
+            {canManage && (
+              <div className="border-t border-border pt-4">
+                <h3 className={sectionTitle}>Gerenciar tela</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => copy(playerUrl(client.id))}
+                    className={ui.buttonSecondary}
+                  >
+                    {copyState === "copied" ? (
+                      <Check aria-hidden="true" className="h-4 w-4" />
+                    ) : (
+                      <Copy aria-hidden="true" className="h-4 w-4" />
+                    )}
+                    {copyState === "copied" ? "Copiado" : "Copiar endereço do player"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRenaming(true)}
+                    className={ui.buttonSecondary}
+                  >
+                    <Pencil aria-hidden="true" className="h-4 w-4" />
+                    Renomear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRemoveError("");
+                      setRemoving(true);
+                    }}
+                    className={ui.buttonDanger}
+                  >
+                    <Trash2 aria-hidden="true" className="h-4 w-4" />
+                    Remover tela
+                  </button>
+                </div>
+                {/* O navegador bloqueou a cópia: mostra o endereço selecionado. */}
+                {copyState === "failed" && (
+                  <div className="mt-3">
+                    <PlayerAddress clientId={client.id} selectOnMount />
+                  </div>
+                )}
+                <p role="status" className="sr-only">
+                  {copyState === "copied" ? "Endereço copiado." : ""}
+                </p>
               </div>
-            </Notice>
-          )}
-
-          <div className="mb-2 flex items-center justify-between gap-2 pr-12">
-            <h3 className={`${sectionTitle} mb-0`}>Escolher experiência</h3>
-            {currentExperience && (
-              <button
-                type="button"
-                onClick={() => onUpdate({ experienceId: null })}
-                disabled={busy}
-                className={`${ui.buttonGhost} min-h-9 px-2 text-xs`}
-              >
-                Remover experiência
-              </button>
             )}
-          </div>
-          {renderOptions(
-            experiences.filter((e) => e.active),
-            client.currentExperienceId,
-            Clapperboard,
-            (id) => ({ experienceId: id }),
-          )}
+          </section>
 
-          <div className="mt-6 mb-2 flex items-center justify-between gap-2">
-            <h3 className={`${sectionTitle} mb-0`}>Escolher imagem</h3>
-            {currentImage && (
-              <button
-                type="button"
-                onClick={() => onUpdate({ imgId: null })}
-                disabled={busy}
-                className={`${ui.buttonGhost} min-h-9 px-2 text-xs`}
-              >
-                Remover imagem
-              </button>
+          {/* Direita: escolha do conteúdo */}
+          <section className="min-h-0 flex-1 p-5 md:overflow-y-auto">
+            {pending && (
+              <Notice variant="warning" className="mb-4 mr-12">
+                <p>
+                  {pending.item.title} é em{" "}
+                  {orientationLabel[pending.item.orientation].toLowerCase()} e a
+                  tela está em{" "}
+                  {client.reportedOrientation
+                    ? orientationLabel[client.reportedOrientation].toLowerCase()
+                    : "outra orientação"}
+                  . O conteúdo pode aparecer cortado ou com bordas.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onUpdate(pending.update);
+                      setPending(null);
+                    }}
+                    className={ui.buttonPrimary}
+                  >
+                    Aplicar assim mesmo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPending(null)}
+                    className={ui.buttonSecondary}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </Notice>
             )}
-          </div>
-          {renderOptions(
-            images.filter((i) => i.active),
-            client.imgId,
-            ImageIcon,
-            (id) => ({ imgId: id }),
-          )}
-          <p className={`${ui.hint} mt-4`}>
-            Sem experiência nem imagem, a tela exibe o stand-by.
-          </p>
-        </section>
-      </div>
-    </dialog>
+
+            <div className="mb-2 flex items-center justify-between gap-2 pr-12">
+              <h3 className={`${sectionTitle} mb-0`}>Escolher experiência</h3>
+              {currentExperience && (
+                <button
+                  type="button"
+                  onClick={() => onUpdate({ experienceId: null })}
+                  disabled={busy}
+                  className={`${ui.buttonGhost} min-h-9 px-2 text-xs`}
+                >
+                  Remover experiência
+                </button>
+              )}
+            </div>
+            {renderOptions(
+              experiences.filter((e) => e.active),
+              client.currentExperienceId,
+              Clapperboard,
+              (id) => ({ experienceId: id }),
+            )}
+
+            <div className="mt-6 mb-2 flex items-center justify-between gap-2">
+              <h3 className={`${sectionTitle} mb-0`}>Escolher imagem</h3>
+              {currentImage && (
+                <button
+                  type="button"
+                  onClick={() => onUpdate({ imgId: null })}
+                  disabled={busy}
+                  className={`${ui.buttonGhost} min-h-9 px-2 text-xs`}
+                >
+                  Remover imagem
+                </button>
+              )}
+            </div>
+            {renderOptions(
+              images.filter((i) => i.active),
+              client.imgId,
+              ImageIcon,
+              (id) => ({ imgId: id }),
+            )}
+            <p className={`${ui.hint} mt-4`}>
+              Sem experiência nem imagem, a tela exibe o stand-by.
+            </p>
+          </section>
+        </div>
+      </dialog>
+
+      {renaming && (
+        <ClientFormModal client={client} onClose={() => setRenaming(false)} />
+      )}
+
+      {removing && (
+        <ConfirmModal
+          title={`Remover ${client.name}?`}
+          confirmLabel="Remover tela"
+          busyLabel="Removendo..."
+          busy={removeBusy}
+          error={removeError}
+          onConfirm={remove}
+          onClose={() => setRemoving(false)}
+        >
+          A tela sai da planta e da lista. A máquina que estiver mostrando esta
+          tela passa a exibir “Tela não cadastrada”. Isso não pode ser desfeito.
+        </ConfirmModal>
+      )}
+    </>
   );
 }

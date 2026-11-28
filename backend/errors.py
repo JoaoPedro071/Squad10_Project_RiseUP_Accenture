@@ -8,13 +8,14 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from services.validation import validate_experience, validate_image
+from services.validation import validate_client, validate_experience, validate_image
 
 # Rotas de cadastro que respondem com erro por campo mesmo quando o corpo
 # chega vazio ou com JSON invalido.
 FORM_ROUTES = {
     "/api/experiences": validate_experience,
     "/api/images": validate_image,
+    "/api/clients": validate_client,
 }
 
 

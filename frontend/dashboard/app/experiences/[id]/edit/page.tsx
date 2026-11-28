@@ -3,6 +3,7 @@ import ExperienceForm from "@/components/ExperienceForm";
 import { fetchExperiences, fetchState } from "@/services/api";
 import BackLink from "@/components/BackLink";
 import NoPermission from "@/components/NoPermission";
+import PageHeader from "@/components/PageHeader";
 import { canManage } from "@/lib/permissions";
 import { requireUser, withSession } from "@/services/session";
 
@@ -30,7 +31,7 @@ export default async function EditExperiencePage({
   return (
     <section>
       <BackLink href="/experiences" label="Experiências" />
-      <h1 className="mb-6 text-3xl font-bold">Editar experiência</h1>
+      <PageHeader title="Editar experiência" />
       <ExperienceForm experience={experience} screensInUse={screensInUse} />
     </section>
   );

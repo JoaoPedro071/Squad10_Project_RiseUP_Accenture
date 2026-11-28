@@ -40,6 +40,16 @@ class Client(CamelModel):
     locked: bool = False  # true = posição travada
 
 
+class ClientCreate(CamelModel):
+    """Corpo do POST /api/clients e do PUT /api/clients/{id} (renomear).
+
+    Any de proposito: quem valida (e devolve as mensagens em portugues) e
+    services/validation.py, igual ao cadastro de experiencias.
+    """
+
+    name: Any = None
+
+
 class ContentUpdate(CamelModel):
     """Corpo do PUT /api/clients/{id}/content.
 

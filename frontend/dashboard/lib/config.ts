@@ -15,6 +15,11 @@ export const SESSION_COOKIE = "em_session";
 export const CLIENT_APP_URL =
   process.env.NEXT_PUBLIC_CLIENT_APP_URL ?? "http://localhost:3001";
 
+/** Endereço que a máquina ligada à tela abre (em tela cheia). */
+export function playerUrl(clientId: string): string {
+  return `${CLIENT_APP_URL}/?client=${encodeURIComponent(clientId)}`;
+}
+
 /** Endereço de uma imagem para mostrar no dashboard. Caminhos internos
  * (ex.: /demo-image.svg) ficam no player, então apontam para ele. */
 export function mediaUrl(url: string): string {

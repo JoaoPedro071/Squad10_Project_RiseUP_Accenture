@@ -1,6 +1,7 @@
 import StandbyForm from "@/components/StandbyForm";
 import { fetchImages, fetchSettings } from "@/services/api";
 import NoPermission from "@/components/NoPermission";
+import PageHeader from "@/components/PageHeader";
 import { canManage } from "@/lib/permissions";
 import { requireUser, withSession } from "@/services/session";
 
@@ -14,7 +15,7 @@ export default async function SettingsPage() {
 
   return (
     <section>
-      <h1 className="mb-6 text-3xl font-bold">Configurações</h1>
+      <PageHeader title="Configurações" subtitle="Ajustes gerais das telas." />
       <StandbyForm
         images={images.filter((i) => i.active)}
         initialStandbyId={settings.standbyImageId}

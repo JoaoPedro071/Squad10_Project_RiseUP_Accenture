@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { orientationLabel } from "@/lib/orientation";
-import { sectorLabel } from "@/lib/sectors";
 import { ui } from "@/lib/ui";
 import { ApiError, setExperienceActive } from "@/services/api";
 import type { Experience } from "@/types/api";
@@ -43,40 +42,44 @@ export default function ExperienceCard({
     }
   }
 
+  const showHint = canManage && experience.active && inUseCount > 0;
+
+  // Corpo em cima (avisos e erro no fim dele) e rodapé com os botões colado
+  // embaixo: os botões ficam na mesma altura em todos os cards da linha.
   return (
     <article
-      className={`${ui.card} flex flex-col ${
-        experience.active ? "" : "opacity-60"
-      }`}
+      className={`${ui.cardFrame} ${experience.active ? "" : "opacity-60"}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="text-lg leading-tight font-bold">{experience.title}</h2>
-        {!experience.active && <span className={ui.chip}>Inativa</span>}
-      </div>
-      {experience.description && (
-        <p className="mt-2 text-sm text-foreground/80">
-          {experience.description}
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-lg leading-tight font-bold">{experience.title}</h2>
+          {!experience.active && <span className={ui.chip}>Inativa</span>}
+        </div>
+        {experience.description && (
+          <p className="mt-2 text-sm text-foreground/80">
+            {experience.description}
+          </p>
+        )}
+        <p className="mt-3 text-xs text-muted">
+          Página web · {orientationLabel[experience.orientation]}
+          {inUseCount > 0 &&
+            ` · Em ${inUseCount} ${inUseCount === 1 ? "tela" : "telas"}`}
         </p>
-      )}
-      <p className="mt-3 text-xs text-muted">
-        Página web · {orientationLabel[experience.orientation]}
-        {inUseCount > 0 &&
-          ` · Em ${inUseCount} ${inUseCount === 1 ? "tela" : "telas"}`}
-      </p>
-      <ul className="mt-2 flex flex-wrap gap-1" aria-label="Setores e tags">
-        {experience.sectors.map((sector) => (
-          <li key={sector} className={ui.chipAccent}>
-            {sectorLabel(sector)}
-          </li>
-        ))}
-        {experience.tags.map((tag) => (
-          <li key={tag} className={ui.chip}>
-            #{tag}
-          </li>
-        ))}
-      </ul>
+        {showHint && (
+          <div className="mt-3">
+            <p className={ui.hint}>
+              Ao inativar, as telas continuam exibindo até você trocar o conteúdo.
+            </p>
+          </div>
+        )}
+        {error && (
+          <Notice variant="error" className="mt-3">
+            {error}
+          </Notice>
+        )}
+      </div>
       {canManage && (
-        <div className="mt-auto flex flex-wrap gap-2 pt-4">
+        <div className={ui.cardFooter}>
           <Link
             href={`/experiences/${experience.id}/edit`}
             className={ui.buttonSecondary}
@@ -98,16 +101,6 @@ export default function ExperienceCard({
             {busy ? "Salvando..." : experience.active ? "Inativar" : "Reativar"}
           </button>
         </div>
-      )}
-      {canManage && experience.active && inUseCount > 0 && (
-        <p className={ui.hint}>
-          Ao inativar, as telas continuam exibindo até você trocar o conteúdo.
-        </p>
-      )}
-      {error && (
-        <Notice variant="error" className="mt-2">
-          {error}
-        </Notice>
       )}
     </article>
   );

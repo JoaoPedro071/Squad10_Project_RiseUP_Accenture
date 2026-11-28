@@ -10,7 +10,7 @@ Requer o [uv](https://docs.astral.sh/uv/). Ele usa o Python 3.12 (`.python-versi
 uv sync                                         # cria o .venv e instala tudo
 uv run python manage.py create-user --email voce@exemplo.com --name "Seu Nome" --role coordination
 uv run uvicorn main:app --reload --port 8000
-uv run pytest                                   # 119 testes
+uv run pytest                                   # 132 testes
 ```
 
 Dependências: `uv add <pacote>` (app) ou `uv add --dev <pacote>` (só desenvolvimento). Sempre commite o `pyproject.toml` junto com o `uv.lock`.
@@ -47,8 +47,11 @@ Se o front for aberto por outro endereço (IP da máquina, outra porta), acresce
 - **Usuários:** criados pelo terminal, não há cadastro aberto:
   `uv run python manage.py create-user --email ana@exemplo.com --name "Ana" --role coordination`
   (a senha é pedida duas vezes, sem aparecer; mínimo de 8 caracteres).
-- **Perfis:** `coordination` (Coordenação) pode tudo. `support` (Apoio) vê tudo, troca conteúdo, usa o Modo foco e identifica telas, mas não mexe no catálogo, no stand-by nem nas posições (recebe 403).
-- **Sessão:** o login devolve um cookie `em_session` (`HttpOnly`, `SameSite=Lax`, `Secure` em produção) que vale `SESSION_HOURS`. No banco fica só o hash do token; "Sair" apaga a sessão na hora.
+- **Perfis:** `coordination` (Coordenação) pode tudo. `support` (Apoio) vê tudo, troca conteúdo, usa o Modo foco e identifica telas, mas não mexe no catálogo, no stand-by, nas posições nem no cadastro de telas (recebe 403).
+- **Sessão:** o login devolve um cookie `em_session` (`HttpOnly`, `SameSite=Lax`, `Secure` em produção) que vale `SESSION_HOURS`. No banco fica só o hash do token.
+  - "Sair" apaga a sessão na hora e fecha o `/ws/dashboard` daquela sessão (código 4401).
+  - Sessão expirada: o `/ws/dashboard` dela fecha em até 2 s (4401).
+  - A cada login, as sessões vencidas são apagadas do banco.
 - **Senhas:** guardadas com hash argon2. A mensagem de erro é a mesma para e-mail inexistente e senha errada; depois de 5 tentativas erradas em 1 minuto, responde 429.
 - **Rotas abertas:** player (`GET /display`, `POST /heartbeat`, `/ws/player`), `GET /api/health` e o próprio login. Elas passam a exigir o token da tela no pareamento.
 - **Deploy:** o dashboard (servidor Next) repassa o cookie ao backend, então os dois precisam do mesmo domínio-base (ex.: `app.exemplo.com` e `api.exemplo.com`); isso será configurado na trilha de deploy.
@@ -59,7 +62,7 @@ Se o front for aberto por outro endereço (IP da máquina, outra porta), acresce
 
 | Campo | Quem define | Significado |
 |---|---|---|
-| `id`, `name` | Cadastro | Identificação. O nome aparece no mapa |
+| `id`, `name` | Cadastro (Coordenação) | Identificação. O `id` é gerado (`cli-` + 8 caracteres); o nome aparece no mapa |
 | `currentExperienceId` | Operador | Experiência atribuída (ou `null`) |
 | `imgId` | Operador | Imagem atribuída (ou `null`) |
 | `displayImg` | Operador | `true` = exibe a imagem no lugar da experiência, sem perder nenhuma das duas |
@@ -80,7 +83,7 @@ Se o front for aberto por outro endereço (IP da máquina, outra porta), acresce
 
 Conteúdo com orientação `any` e o stand-by nunca geram erro de orientação.
 
-**Experiência:** `id, title, description, url, type ("web"), orientation ("landscape" | "portrait" | "any"), sectors, tags, active`. Setores em lista fechada (`finance`, `retail`, `emerging_tech`, `other`, ao menos um); tags livres (até 5). Inativar não apaga: só impede novas atribuições, e quem já exibe continua até ser trocado.
+**Experiência:** `id, title, description, url, type ("web"), orientation ("landscape" | "portrait" | "any"), active`. Inativar não apaga: só impede novas atribuições, e quem já exibe continua até ser trocado.
 
 **Imagem:** `id, title, description, url, orientation, active`. Inativar não apaga: só impede novas atribuições, e quem já exibe continua até ser trocado.
 
@@ -98,7 +101,7 @@ Quem pode: **Login** = qualquer pessoa logada; **Coord.** = só Coordenação; *
 | `POST /api/auth/logout` | Aberta | n/a | 204 | n/a |
 | `GET /api/auth/me` | Login | n/a | `User` | 401 |
 | `GET /api/experiences` | Login | n/a | `Experience[]` | n/a |
-| `POST /api/experiences` | Coord. | title, description, url, type, orientation, sectors, tags | 201 `Experience` | 400 `{fieldErrors}` |
+| `POST /api/experiences` | Coord. | title, description, url, type, orientation | 201 `Experience` | 400 `{fieldErrors}` |
 | `PUT /api/experiences/{id}` | Coord. | mesmos campos do cadastro | `Experience` | 400 `{fieldErrors}`, 404 |
 | `PUT /api/experiences/{id}/active` | Coord. | `{active: bool}` | `Experience` | 422, 404 |
 | `GET /api/images` | Login | n/a | `Image[]` | n/a |
@@ -108,6 +111,9 @@ Quem pode: **Login** = qualquer pessoa logada; **Coord.** = só Coordenação; *
 | `GET /api/settings` | Login | n/a | `{standbyImageId}` | n/a |
 | `PUT /api/settings` | Coord. | `{standbyImageId: id \| null}` | `{standbyImageId}` | 422 (imagem inexistente ou inativa) |
 | `GET /api/clients` | Login | n/a | `Client[]` | n/a |
+| `POST /api/clients` | Coord. | `{name}` | 201 `Client` | 400 `{fieldErrors}` |
+| `PUT /api/clients/{id}` | Coord. | `{name}` | `Client` | 400 `{fieldErrors}`, 404 |
+| `DELETE /api/clients/{id}` | Coord. | n/a | 204 | 404, 409 (tela no Modo foco) |
 | `PUT /api/clients/{id}/content` | Login | `{experienceId?, imgId?, displayImg?}` | `Client` | 422, 404 |
 | `PUT /api/clients/{id}/position` | Coord. | `{x, y}` em % (0 a 100) | `Client` | 422, 403 (tela travada), 404 |
 | `PUT /api/clients/{id}/lock` | Coord. | `{locked: bool}` | `Client` | 422, 404 |
@@ -122,6 +128,13 @@ Quem pode: **Login** = qualquer pessoa logada; **Coord.** = só Coordenação; *
 Formatos de erro: validação de cadastro devolve 400 `{"fieldErrors": {campo: mensagem}}`; os demais devolvem `{"error": "mensagem"}`, sempre em português.
 
 `focus` é `null` ou `{clientId}`.
+
+### Cadastro de telas (`POST`, `PUT` e `DELETE /api/clients`)
+
+- **Nome:** obrigatório, até 60 caracteres e sem repetir o de outra tela (ignora maiúsculas e acentos). Erros em `fieldErrors.name`: "Informe o nome da tela.", "Use no máximo 60 caracteres no nome." ou "Já existe uma tela com este nome.".
+- **Tela nova:** nasce no centro da planta (`x = 50`, `y = 50`), destravada e sem conteúdo.
+- **Renomear:** mesmas regras do nome; manter o próprio nome (mesmo mudando maiúsculas) não conta como repetido.
+- **Remover:** apaga a tela e o sinal de vida dela. Se o player estiver conectado, a conexão fecha com 4404 e ele mostra "Tela não cadastrada". A tela em foco não pode ser removida (409 "Esta tela está no Modo foco. Saia do Modo foco antes de removê-la.").
 
 ### Conteúdo da tela (`PUT /api/clients/{id}/content`)
 
@@ -157,8 +170,8 @@ Carregando, falha ao carregar o conteúdo e sem conexão são estados **locais**
 
 | Rota | Quem conecta | Recebe ao conectar e a cada mudança |
 |---|---|---|
-| `/ws/player/{clientId}` | Player (aberta) | `{"type": "display", "version": n, "state": DisplayState}` (tela desconhecida: fecha com código 4404) |
-| `/ws/dashboard` | Dashboard (com login; sem sessão fecha com 4401) | `{"type": "state", "focus", "clients"}` |
+| `/ws/player/{clientId}` | Player (aberta) | `{"type": "display", "version": n, "state": DisplayState}` (tela desconhecida ou removida: fecha com código 4404) |
+| `/ws/dashboard` | Dashboard (com login; sem sessão, logout ou sessão expirada: fecha com 4401) | `{"type": "state", "focus", "clients"}` |
 
 O player envia pelo mesmo canal:
 
@@ -168,7 +181,7 @@ O player envia pelo mesmo canal:
 | `{"type": "ack", "version": n}` | Confirma que exibiu a mudança; o dashboard recebe `{"type": "ack", "clientId", "version"}` e mostra "Concluído" |
 
 - Toda alteração bem-sucedida (`POST`, `PUT` ou `DELETE` em `/api`) avisa as telas afetadas e o dashboard. A tela que teve o conteúdo trocado sempre recebe o aviso, para poder confirmar.
-- Uma checagem a cada 2 s avisa o dashboard quando uma tela passa do tempo limite sem sinal de vida.
+- Uma checagem a cada 2 s avisa o dashboard quando uma tela passa do tempo limite sem sinal de vida e fecha as conexões do dashboard com sessão vencida.
 - `POST /api/clients/identify`: cada tela conectada recebe `{"type": "identify", "number", "name", "seconds"}` e mostra o número por 10 s; o dashboard recebe `{"type": "identify", "numbers", "seconds"}`.
 - A origem da conexão é conferida com `CORS_ORIGINS` (o navegador não aplica CORS a WebSocket).
 - As conexões ficam na memória do processo: rode com **um único worker**.
@@ -202,10 +215,7 @@ export type ContentOrientation = Orientation | "any";
 
 export type Experience = {
   id: string; title: string; description: string; url: string;
-  type: "web"; orientation: ContentOrientation;
-  sectors: ("finance" | "retail" | "emerging_tech" | "other")[]; // ao menos um
-  tags: string[]; // até 5, até 30 caracteres cada
-  active: boolean;
+  type: "web"; orientation: ContentOrientation; active: boolean;
 };
 
 export type Image = {

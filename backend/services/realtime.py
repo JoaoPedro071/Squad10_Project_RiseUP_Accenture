@@ -33,7 +33,8 @@ class Hub:
     def reset(self) -> None:
         # id da tela -> conexoes abertas (a mesma tela pode estar em 2 abas)
         self.players: dict[str, set[WebSocket]] = {}
-        self.dashboards: set[WebSocket] = set()
+        # conexao do dashboard -> hash do token da sessao (None = sem cookie)
+        self.dashboards: dict[WebSocket, str | None] = {}
         self._last_display: dict[str, str] = {}  # ultimo estado enviado a cada tela
         self._version: dict[str, int] = {}  # numero da ultima mudanca enviada
         self._last_board: str | None = None
@@ -52,12 +53,40 @@ class Hub:
             del self.players[client_id]
             self._last_display.pop(client_id, None)
 
-    async def add_dashboard(self, websocket: WebSocket) -> None:
-        self.dashboards.add(websocket)
+    async def close_player(self, client_id: str) -> None:
+        """Tela removida: fecha o player com 4404 (ele mostra o aviso de
+        tela nao cadastrada) e esquece o que foi enviado a ela."""
+        sockets = self.players.pop(client_id, set())
+        self._last_display.pop(client_id, None)
+        self._version.pop(client_id, None)
+        for websocket in sockets:
+            try:
+                await websocket.close(code=4404, reason="Tela não cadastrada")
+            except Exception:  # conexao ja caiu
+                logger.debug("Falha ao fechar conexao da tela", exc_info=True)
+
+    async def add_dashboard(self, websocket: WebSocket, session_hash: str | None) -> None:
+        self.dashboards[websocket] = session_hash
         await self._send({websocket}, self._board_message())
 
     def remove_dashboard(self, websocket: WebSocket) -> None:
-        self.dashboards.discard(websocket)
+        self.dashboards.pop(websocket, None)
+
+    # --- fim da sessao do dashboard ---
+    async def _close_dashboards(self, sockets: list[WebSocket]) -> None:
+        """Fecha com 4401: o dashboard volta para a tela de login."""
+        for websocket in sockets:
+            self.dashboards.pop(websocket, None)
+            try:
+                await websocket.close(code=4401, reason="Faça login para continuar")
+            except Exception:  # conexao ja caiu
+                logger.debug("Falha ao fechar conexao do dashboard", exc_info=True)
+
+    async def close_session(self, session_hash: str) -> None:
+        """Logout: fecha todas as abas do dashboard daquela sessao."""
+        await self._close_dashboards(
+            [ws for ws, h in self.dashboards.items() if h == session_hash]
+        )
 
     # --- envio ---
     async def _send(self, sockets, message: dict) -> None:
@@ -125,7 +154,15 @@ class Hub:
 
     async def tick(self) -> None:
         """Roda a cada poucos segundos: avisa o dashboard quando uma tela passa
-        do tempo limite sem sinal de vida (vira Desligada)."""
+        do tempo limite sem sinal de vida (vira Desligada). Antes, fecha as
+        conexoes do dashboard cuja sessao expirou ou foi apagada."""
+        await self._close_dashboards(
+            [
+                ws
+                for ws, h in self.dashboards.items()
+                if h is not None and store.find_session_user(h) is None
+            ]
+        )
         await self._send_board(only_if_changed=True)
 
 

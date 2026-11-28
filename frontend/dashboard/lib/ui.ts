@@ -3,21 +3,35 @@
 
 const buttonBase =
   "interactive inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50";
+// Mesma altura (44 px), com menos recuo e texto menor; nunca quebra linha.
+const buttonCompactBase =
+  "interactive inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-bold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50";
 
 export const ui = {
+  /** Coluna da página: a mesma no cabeçalho e no conteúdo (alinha logo e títulos). */
+  container: "mx-auto w-full max-w-7xl px-4 md:px-8",
+  /** Grade de cards das listas (Telas, Experiências, Imagens). */
+  cardGrid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+
   /** Ação principal da tela (uma por área). */
   buttonPrimary: `${buttonBase} bg-accent text-white hover:bg-accent-hover`,
   /** Ações secundárias (Cancelar, Editar...). */
   buttonSecondary: `${buttonBase} border border-border bg-card text-foreground hover:border-accent-light/60 hover:bg-accent/10`,
   /** Ações discretas em barras e menus. */
   buttonGhost: `${buttonBase} text-muted hover:bg-accent/10 hover:text-foreground`,
+  /** Versão compacta do buttonGhost (rodapé dos cards). */
+  buttonGhostCompact: `${buttonCompactBase} text-muted hover:bg-accent/10 hover:text-foreground`,
   /** Ações que removem algo. */
   buttonDanger: `${buttonBase} border border-danger/50 text-danger hover:bg-danger/10`,
 
   card: "rounded-lg border border-border bg-card p-4",
+  /** Card com rodapé: o corpo (p-4, flex-1) fica em cima e o cardFooter
+   * colado embaixo, na mesma altura em todos os cards da linha. */
+  cardFrame: "flex h-full flex-col rounded-lg border border-border bg-card",
+  cardFooter: "mt-auto flex flex-wrap items-center gap-2 border-t border-border px-4 py-3",
   label: "mb-1 block text-sm font-bold",
   hint: "mt-1 text-xs text-muted",
-  /** Etiqueta pequena (setores, tags, "Inativa"...). */
+  /** Etiqueta pequena ("Inativa", "Stand-by atual"...). */
   chip: "inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs",
   chipAccent:
     "inline-flex items-center rounded-full border border-accent-light/50 px-2 py-0.5 text-xs text-accent-light",

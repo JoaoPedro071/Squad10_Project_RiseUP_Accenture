@@ -47,7 +47,9 @@ type FloorPlanProps = {
   initialFocus: FocusState | null;
   experiences: Experience[];
   images: Image[];
-  canEditPositions: boolean; // Coordenação: mover e travar telas
+  // Coordenação (canManage da página): mover e travar telas e, nos detalhes,
+  // copiar endereço, renomear e remover.
+  canEditPositions: boolean;
 };
 
 export default function FloorPlan({
@@ -332,6 +334,7 @@ export default function FloorPlan({
           images={images}
           busy={board.busyId === selected.id}
           focusActive={focus !== null || board.focusBusy}
+          canManage={canEditPositions}
           onClose={() => setSelectedId(null)}
           onUpdate={(update) => {
             board.updateContent(selected.id, update);

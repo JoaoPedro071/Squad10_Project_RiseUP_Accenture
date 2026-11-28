@@ -24,7 +24,7 @@ Cada tela abre o player com o seu id: `http://<player>/?client=<id da tela>`. Em
 - A cada **5 s** (e ao girar ou redimensionar a tela) envia o sinal de vida com a orientação e a resolução. Sem aviso por 15 s, o dashboard mostra a tela como *Desligada*.
 - Confirma cada mudança depois de exibi-la; é isso que faz o dashboard mostrar "Concluído".
 - Modo de identificação: mostra o número e o nome da tela por cima do conteúdo por 10 s.
-- Sem conexão, mantém o que está na tela, mostra "Reconectando..." no canto e tenta de novo com espera crescente (1 s até 30 s). Avisos próprios: "Conectando...", "Tela não identificada" (sem `?client=`) e "Tela não cadastrada" (id desconhecido).
+- Sem conexão, mantém o que está na tela, mostra "Reconectando..." no canto e tenta de novo com espera crescente (1 s até 30 s). Avisos próprios: "Conectando...", "Tela não identificada" (sem `?client=`) e "Tela não cadastrada" (id desconhecido, ou tela removida no painel enquanto o player estava aberto).
 - Sem elementos interativos e sem cursor.
 - Visual da marca Accenture: fundo preto, símbolo ">" oficial nas telas de aviso e Arial (para trocar pela Graphik, mude só `--font-brand` em `app/globals.css`). Animações desligadas para quem prefere menos movimento.
 
