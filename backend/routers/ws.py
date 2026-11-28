@@ -1,12 +1,15 @@
 """Rotas WebSocket: tela (player) e dashboard."""
 
 import json
+from typing import Annotated
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from config import CORS_ORIGINS
+from dependencies import socket_user
 from models.store import store
 from routers.clients import RESOLUTION
+from schemas.user import User
 from services.realtime import hub
 
 router = APIRouter()
@@ -66,10 +69,16 @@ async def player_socket(websocket: WebSocket, client_id: str):
 
 
 @router.websocket("/ws/dashboard")
-async def dashboard_socket(websocket: WebSocket):
+@router.websocket("/ws/dashboard")
+async def dashboard_socket(
+    websocket: WebSocket, user: Annotated[User | None, Depends(socket_user)]
+):
     await websocket.accept()
     if not _allowed_origin(websocket):
         await websocket.close(code=4403, reason="Origem não permitida")
+        return
+    if user is None:
+        await websocket.close(code=4401, reason="Faça login para continuar")
         return
     await hub.add_dashboard(websocket)
     try:

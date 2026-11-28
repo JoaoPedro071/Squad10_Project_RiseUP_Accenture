@@ -1,10 +1,11 @@
 from fastapi import APIRouter
 
+from dependencies import LOGGED
 from errors import ApiError
 from models.store import store
 from schemas.focus import FocusResponse, FocusStart
 
-router = APIRouter(prefix="/api/focus", tags=["focus"])
+router = APIRouter(prefix="/api/focus", tags=["focus"], dependencies=LOGGED)
 
 # codigo interno -> (mensagem, status), igual ao front
 FOCUS_ERRORS = {

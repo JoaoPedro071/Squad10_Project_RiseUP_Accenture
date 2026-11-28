@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import CORS_ORIGINS
 from errors import register_error_handlers
-from routers import clients, experiences, focus, images, settings, ws
+from routers import auth, clients, experiences, focus, images, settings, ws
 from services.realtime import hub, run_ticker
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ app = FastAPI(title="Experience Manager API", version="0.1.0", lifespan=lifespan
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_credentials=True,  # o navegador envia o cookie de sessao
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type"],
 )
@@ -47,6 +48,7 @@ async def notify_realtime(request: Request, call_next):
     if (
         request.method in WRITE_METHODS
         and path.startswith("/api/")
+        and not path.startswith("/api/auth/")
         and response.status_code < 400
     ):
         match = CONTENT_PATH.match(path)
@@ -60,6 +62,7 @@ async def notify_realtime(request: Request, call_next):
     return response
 
 
+app.include_router(auth.router)
 app.include_router(experiences.router)
 app.include_router(images.router)
 app.include_router(settings.router)

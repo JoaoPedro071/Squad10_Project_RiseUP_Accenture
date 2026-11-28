@@ -1,6 +1,8 @@
 import Link from "next/link";
 import ExperienceCard from "@/components/ExperienceCard";
 import { fetchExperiences, fetchState } from "@/services/api";
+import { canManage } from "@/lib/permissions";
+import { currentUser, withSession } from "@/services/session";
 
 export const dynamic = "force-dynamic";
 
@@ -8,10 +10,15 @@ type ExperiencesPageProps = {
   searchParams: Promise<{ status?: string }>;
 };
 
-export default async function ExperiencesPage({ searchParams }: ExperiencesPageProps) {
+export default async function ExperiencesPage({
+  searchParams,
+}: ExperiencesPageProps) {
   const { status } = await searchParams;
   const showInactive = status === "inactive";
-  const [experiences, state] = await Promise.all([fetchExperiences(), fetchState()]);
+  const [experiences, state] = await withSession((cookie) =>
+    Promise.all([fetchExperiences(cookie), fetchState(cookie)]),
+  );
+  const manage = canManage(await currentUser());
 
   const active = experiences.filter((e) => e.active);
   const inactive = experiences.filter((e) => !e.active);
@@ -28,12 +35,14 @@ export default async function ExperiencesPage({ searchParams }: ExperiencesPageP
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">Experiências</h1>
-        <Link
-          href="/experiences/new"
-          className="inline-flex min-h-11 items-center rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          Nova experiência
-        </Link>
+        {manage && (
+          <Link
+            href="/experiences/new"
+            className="inline-flex min-h-11 items-center rounded-md bg-accent px-4 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            Nova experiência
+          </Link>
+        )}
       </div>
       <nav aria-label="Filtrar experiências" className="mb-4 flex gap-2">
         <Link
@@ -53,7 +62,9 @@ export default async function ExperiencesPage({ searchParams }: ExperiencesPageP
       </nav>
       {shown.length === 0 ? (
         <p>
-          {showInactive ? "Nenhuma experiência inativa." : "Nenhuma experiência ativa."}
+          {showInactive
+            ? "Nenhuma experiência inativa."
+            : "Nenhuma experiência ativa."}
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -62,6 +73,7 @@ export default async function ExperiencesPage({ searchParams }: ExperiencesPageP
               key={experience.id}
               experience={experience}
               inUseCount={inUseCount(experience.id)}
+              canManage={manage}
             />
           ))}
         </div>

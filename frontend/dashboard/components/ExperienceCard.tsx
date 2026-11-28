@@ -11,9 +11,14 @@ import type { Experience } from "@/types/api";
 type ExperienceCardProps = {
   experience: Experience;
   inUseCount: number; // telas com esta experiência atribuída
+  canManage: boolean; // Coordenação: pode editar e inativar
 };
 
-export default function ExperienceCard({ experience, inUseCount }: ExperienceCardProps) {
+export default function ExperienceCard({
+  experience,
+  inUseCount,
+  canManage,
+}: ExperienceCardProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -26,7 +31,9 @@ export default function ExperienceCard({ experience, inUseCount }: ExperienceCar
       router.refresh(); // recarrega a lista do servidor
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : "Não foi possível salvar. Tente novamente.",
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível salvar. Tente novamente.",
       );
     } finally {
       setBusy(false);
@@ -48,7 +55,9 @@ export default function ExperienceCard({ experience, inUseCount }: ExperienceCar
         )}
       </div>
       {experience.description && (
-        <p className="mt-2 text-sm text-foreground/80">{experience.description}</p>
+        <p className="mt-2 text-sm text-foreground/80">
+          {experience.description}
+        </p>
       )}
       <p className="mt-3 text-xs text-foreground/60">
         Página web · {orientationLabel[experience.orientation]}
@@ -65,28 +74,33 @@ export default function ExperienceCard({ experience, inUseCount }: ExperienceCar
           </li>
         ))}
         {experience.tags.map((tag) => (
-          <li key={tag} className="rounded-full border border-border px-2 py-0.5 text-xs">
+          <li
+            key={tag}
+            className="rounded-full border border-border px-2 py-0.5 text-xs"
+          >
             #{tag}
           </li>
         ))}
       </ul>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href={`/experiences/${experience.id}/edit`}
-          className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          Editar
-        </Link>
-        <button
-          type="button"
-          onClick={toggleActive}
-          disabled={busy}
-          className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {busy ? "Salvando..." : experience.active ? "Inativar" : "Reativar"}
-        </button>
-      </div>
-      {experience.active && inUseCount > 0 && (
+      {canManage && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={`/experiences/${experience.id}/edit`}
+            className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            Editar
+          </Link>
+          <button
+            type="button"
+            onClick={toggleActive}
+            disabled={busy}
+            className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? "Salvando..." : experience.active ? "Inativar" : "Reativar"}
+          </button>
+        </div>
+      )}
+      {canManage && experience.active && inUseCount > 0 && (
         <p className="mt-1 text-xs text-foreground/60">
           Ao inativar, as telas continuam exibindo até você trocar o conteúdo.
         </p>

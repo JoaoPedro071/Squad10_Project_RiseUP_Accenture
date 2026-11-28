@@ -15,7 +15,7 @@ flowchart LR
     A -.->|"planejado"| G["Gemini Flash (IA)"]
 ```
 
-- **Dashboard:** o operador vê a planta do espaço, escolhe o que cada tela exibe (experiência, imagem ou stand-by), trava a posição e usa o Modo foco (uma tela apresenta e as outras ficam em pausa).
+- **Dashboard:** com login e dois perfis (Coordenação e Apoio), o operador vê a planta do espaço, escolhe o que cada tela exibe (experiência, imagem ou stand-by), trava a posição e usa o Modo foco (uma tela apresenta e as outras ficam em pausa).
 - **API:** guarda o estado, valida cada ação e informa ao player o que exibir.
 - **Player:** página aberta em cada tela. Conectado à API por WebSocket: recebe na hora o que exibir, envia o sinal de vida com a orientação da máquina e confirma cada mudança.
 
@@ -36,9 +36,12 @@ Instale o [uv](https://docs.astral.sh/uv/) uma vez; ele cuida do Python (3.12) e
 ```bash
 cd backend
 uv sync
+uv run python manage.py create-user --email voce@exemplo.com --name "Seu Nome" --role coordination
 uv run uvicorn main:app --reload --port 8000
-uv run pytest                    # 101 testes
+uv run pytest                    # 119 testes
 ```
+
+O `create-user` cria o seu usuário do dashboard (só na primeira vez). A senha é pedida no terminal.
 
 Documentação interativa da API: http://localhost:8000/docs
 
@@ -58,12 +61,13 @@ npm install
 npm run dev                      # http://localhost:3001/?client=cli-1
 ```
 
-Os dois apps usam o backend em `http://localhost:8000`; suba-o primeiro. Detalhes em [`frontend/dashboard/README.md`](frontend/dashboard/README.md) e [`frontend/client-app/README.md`](frontend/client-app/README.md).
+Os dois apps usam o backend em `http://localhost:8000`; suba-o primeiro. O dashboard pede login; o player não. Detalhes em [`frontend/dashboard/README.md`](frontend/dashboard/README.md) e [`frontend/client-app/README.md`](frontend/client-app/README.md).
 
 ## API em resumo
 
 | Rota | O que faz |
 |---|---|
+| `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | login do dashboard (cookie de sessão) |
 | `GET /api/experiences` | lista o catálogo |
 | `POST /api/experiences` | cria uma experiência (com validação, setores e tags) |
 | `PUT /api/experiences/{id}` | edita uma experiência |
@@ -82,7 +86,7 @@ Os dois apps usam o backend em `http://localhost:8000`; suba-o primeiro. Detalhe
 | `PUT /api/clients/{id}/lock` | trava ou destrava a posição |
 | `GET/POST/DELETE /api/focus` | consulta, inicia e encerra o Modo foco |
 
-Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
+Todas as rotas do dashboard exigem login; catálogo, stand-by e posições exigem o perfil Coordenação. As rotas do player ficam abertas até o pareamento. Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
 
 ## Status
 
@@ -95,6 +99,8 @@ Detalhes e formatos de erro em [`backend/README.md`](backend/README.md).
 - [x] CI no GitHub Actions (testes, lint e build)
 - [x] Catálogo completo: editar e inativar experiências, setores e tags, editar imagens
 - [x] Tempo real com WebSocket, confirmação de recebimento e modo de identificação
+- [x] Login no dashboard com perfis Coordenação e Apoio
+- [ ] Pareamento das telas (código e token por tela)
 - [ ] Deploy na AWS com custo zero
 - [ ] Assistente de IA com confirmação do usuário
 - [ ] Telas reais: planta do espaço e design system da Accenture

@@ -38,6 +38,7 @@ type FloorPlanProps = {
   initialFocus: FocusState | null;
   experiences: Experience[];
   images: Image[];
+  canEditPositions: boolean; // Coordenação: mover e travar telas
 };
 
 export default function FloorPlan({
@@ -45,6 +46,7 @@ export default function FloorPlan({
   initialFocus,
   experiences,
   images,
+  canEditPositions,
 }: FloorPlanProps) {
   const board = useBoard(initialClients, initialFocus);
   const { clients, focus } = board;
@@ -183,19 +185,21 @@ export default function FloorPlan({
         live={board.live}
         onIdentify={board.identify}
       >
-        <button
-          type="button"
-          onClick={() => setEditMode((current) => !current)}
-          aria-pressed={editMode}
-          className={`min-h-11 rounded-md border px-3 text-xs hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent ${
-            editMode
-              ? "border-accent text-foreground"
-              : "border-transparent text-foreground/60 hover:text-foreground"
-          }`}
-        >
-          <span aria-hidden="true">{editMode ? "✓ " : "✎ "}</span>
-          {editMode ? "Concluir edição" : "Editar posições"}
-        </button>
+        {canEditPositions && (
+          <button
+            type="button"
+            onClick={() => setEditMode((current) => !current)}
+            aria-pressed={editMode}
+            className={`min-h-11 rounded-md border px-3 text-xs hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent ${
+              editMode
+                ? "border-accent text-foreground"
+                : "border-transparent text-foreground/60 hover:text-foreground"
+            }`}
+          >
+            <span aria-hidden="true">{editMode ? "✓ " : "✎ "}</span>
+            {editMode ? "Concluir edição" : "Editar posições"}
+          </button>
+        )}
       </BoardToolbar>
 
       {editMode && (

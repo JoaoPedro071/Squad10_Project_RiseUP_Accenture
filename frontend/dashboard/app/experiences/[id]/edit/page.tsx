@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import ExperienceForm from "@/components/ExperienceForm";
 import { fetchExperiences, fetchState } from "@/services/api";
+import NoPermission from "@/components/NoPermission";
+import { canManage } from "@/lib/permissions";
+import { requireUser, withSession } from "@/services/session";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +12,11 @@ type EditExperiencePageProps = {
 };
 
 export default async function EditExperiencePage({ params }: EditExperiencePageProps) {
+  if (!canManage(await requireUser())) return <NoPermission />;
   const { id } = await params;
-  const [experiences, state] = await Promise.all([fetchExperiences(), fetchState()]);
+  const [experiences, state] = await withSession((cookie) =>
+    Promise.all([fetchExperiences(cookie), fetchState(cookie)]),
+  );
   const experience = experiences.find((e) => e.id === id);
   if (!experience) notFound();
 

@@ -10,9 +10,14 @@ import type { Image } from "@/types/api";
 type ImageCardProps = {
   image: Image;
   isStandby: boolean; // é a imagem de stand-by atual (não pode ser inativada)
+  canManage: boolean; // Coordenação: pode editar e inativar
 };
 
-export default function ImageCard({ image, isStandby }: ImageCardProps) {
+export default function ImageCard({
+  image,
+  isStandby,
+  canManage,
+}: ImageCardProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -25,7 +30,9 @@ export default function ImageCard({ image, isStandby }: ImageCardProps) {
       router.refresh(); // recarrega a lista do servidor
     } catch (err) {
       setError(
-        err instanceof ApiError ? err.message : "Não foi possível salvar. Tente novamente.",
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível salvar. Tente novamente.",
       );
     } finally {
       setBusy(false);
@@ -65,24 +72,30 @@ export default function ImageCard({ image, isStandby }: ImageCardProps) {
       <p className="mt-3 text-xs text-foreground/60">
         {orientationLabel[image.orientation]}
       </p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href={`/images/${image.id}/edit`}
-          className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          Editar
-        </Link>
-        <button
-          type="button"
-          onClick={toggleActive}
-          disabled={busy || (isStandby && image.active)}
-          title={isStandby ? "Escolha outro stand-by antes de inativar." : undefined}
-          className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {busy ? "Salvando..." : image.active ? "Inativar" : "Reativar"}
-        </button>
-      </div>
-      {isStandby && image.active && (
+      {canManage && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={`/images/${image.id}/edit`}
+            className="inline-flex min-h-11 items-center rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            Editar
+          </Link>
+          <button
+            type="button"
+            onClick={toggleActive}
+            disabled={busy || (isStandby && image.active)}
+            title={
+              isStandby
+                ? "Escolha outro stand-by antes de inativar."
+                : undefined
+            }
+            className="min-h-11 rounded-md border border-border px-4 text-sm hover:bg-accent/20 focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {busy ? "Salvando..." : image.active ? "Inativar" : "Reativar"}
+          </button>
+        </div>
+      )}
+      {canManage && isStandby && image.active && (
         <p className="mt-1 text-xs text-foreground/60">
           Para inativar, escolha outro stand-by em Configurações.
         </p>

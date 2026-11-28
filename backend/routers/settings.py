@@ -1,10 +1,11 @@
 from fastapi import APIRouter
 
+from dependencies import COORDINATION, LOGGED
 from errors import ApiError
 from models.store import store
 from schemas.settings import Settings, SettingsUpdate
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=LOGGED)
 
 
 @router.get("", response_model=Settings)
@@ -12,7 +13,7 @@ async def get_settings():
     return store.get_settings()
 
 
-@router.put("", response_model=Settings)
+@router.put("", response_model=Settings, dependencies=COORDINATION)
 async def update_settings(payload: SettingsUpdate):
     """Escolhe a imagem de stand-by. null remove (as telas sem conteudo ficam pretas)."""
     image_id = payload.standby_image_id

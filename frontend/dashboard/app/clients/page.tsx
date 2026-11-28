@@ -1,14 +1,13 @@
 import ClientsBoard from "@/components/ClientsBoard";
 import { fetchExperiences, fetchImages, fetchState } from "@/services/api";
+import { withSession } from "@/services/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
-  const [state, experiences, images] = await Promise.all([
-    fetchState(),
-    fetchExperiences(),
-    fetchImages(),
-  ]);
+  const [state, experiences, images] = await withSession((cookie) =>
+    Promise.all([fetchState(cookie), fetchExperiences(cookie), fetchImages(cookie)]),
+  );
 
   return (
     <section>
